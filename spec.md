@@ -2,7 +2,7 @@
 
 **Project Portal (PP) — Domain 2**
 CS763 Secure Software Development · Project Assignment 1
-Author: [Your Name] · Version 1.0 · 2026-10-28
+Author: Amber Rastella · Version 1.0 · 2026-10-28
 
 ---
 
