@@ -1,0 +1,13 @@
+// Prisma schema. Feature models (spec.md §3) are added in later phases.
+// The datasource URL is read from DATABASE_URL in prisma.config.ts.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
