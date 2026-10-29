@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+node_modules
+dist
+coverage
+src/generated
+pipeline-logs
+.env
+.env.*
+!.env.example
+*.log
+Dockerfile
+docker-compose.yml

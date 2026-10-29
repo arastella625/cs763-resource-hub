@@ -161,3 +161,125 @@ describe('GET /api/v1/health', () => {
 | `npm run build` | Prisma client generated, `dist/` emitted |
 | `prisma migrate dev` / `migrate deploy` against a temporary `postgres:17` container | "Already in sync" / "No pending migrations to apply" (no models yet) |
 | `npm start` + `curl localhost:3000/api/v1/health` | `Connected to PostgreSQL`, then `{"status":"ok"}`; clean shutdown on SIGTERM |
+
+---
+
+## Entry 2: Docker (multi-stage Dockerfile and compose)
+
+**Timestamp:** 2026-10-28 21:49 EDT
+**Session:** PA1 setup session 2
+
+### Prompt (verbatim)
+
+> go
+
+This approved continuing to Task 3 of the PA1 handoff prompt, which reads:
+
+> **Task 3: Docker.**
+> - Multi-stage `Dockerfile`: a build stage that compiles TypeScript, and a slim runtime stage that copies only the built output and production dependencies.
+> - `docker-compose.yml` with `app` and `db` (PostgreSQL 17) services, a healthcheck on the database, and environment variables loaded from `.env` (also commit a `.env.example` with placeholder values only).
+> - Verify that `docker compose up --build` works and that /health responds.
+> CHECKPOINT.
+
+### Generated
+
+**Summary.** The agent wrote a three-stage `Dockerfile` (`build`, `prod-deps`, `runtime`) on `node:24.22.2-slim` (Debian 12), a `.dockerignore`, and a `docker-compose.yml` with `db` (PostgreSQL 17 with a `pg_isready` healthcheck), a one-shot `migrate` job (`prisma migrate deploy`) and `app`. `app` starts only after `db` is healthy and `migrate` has exited 0. `.env.example` was committed in Entry 1. Compose loads `.env` via `env_file` and variable interpolation, and overrides `DATABASE_URL` to point at the `db` service.
+
+**Files created:** `Dockerfile`, `.dockerignore`, `docker-compose.yml`; README gained a "Running locally" section.
+
+**Iterations during generation**
+
+1. The first version used `npm prune --omit=dev` in the build stage. The runtime image was 819 MB and still contained `prisma`, `typescript` and the Prisma Studio UI deps. Cause: `prisma` and `typescript` are optional peers of `@prisma/client`, so npm marks them `devOptional` in the lockfile and keeps them under `--omit=dev`. Fix: a separate `prod-deps` stage running `npm ci --omit=dev --omit=optional`. Runtime image: 452 MB, `node_modules` 88 MB, production packages only.
+2. The `migrate` job warned that Prisma could not detect libssl. The Prisma schema engine needs OpenSSL, so `openssl` was installed in the build stage only (the runtime uses the pure-JS `pg` adapter).
+
+**`Dockerfile`**
+
+```dockerfile
+# syntax=docker/dockerfile:1
+
+ARG NODE_VERSION=24.22.2
+
+# ---- build: install all deps, generate the Prisma client, compile TypeScript ----
+FROM node:${NODE_VERSION}-slim AS build
+WORKDIR /app
+
+# The Prisma schema engine (used by `prisma migrate` in the compose migrate job) needs libssl.
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig.json tsconfig.build.json prisma.config.ts ./
+COPY prisma ./prisma
+COPY src ./src
+RUN npm run build
+
+# ---- prod-deps: a clean production-only install ----
+FROM node:${NODE_VERSION}-slim AS prod-deps
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --omit=optional
+
+# ---- runtime: built output + production dependencies only ----
+FROM node:${NODE_VERSION}-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+
+COPY --from=build /app/package.json ./
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+
+EXPOSE 3000
+CMD ["node", "dist/server.js"]
+```
+
+**`docker-compose.yml`** (excerpt)
+
+```yaml
+  db:
+    image: postgres:17
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+
+  migrate:
+    build: { context: ., target: build }
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      db: { condition: service_healthy }
+
+  app:
+    build: { context: ., target: runtime }
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+```
+
+### Verification
+
+Fresh run (`docker compose down -v && docker compose up --build -d`):
+
+```
+SERVICE   STATUS
+app       Up 6 seconds (healthy)
+db        Up 13 seconds (healthy)
+migrate   Exited (0) 6 seconds ago
+
+$ curl -i localhost:3000/api/v1/health
+HTTP/1.1 200 OK
+{"status":"ok"}
+
+migrate | Datasource "db": PostgreSQL database "resourcehub", schema "public" at "db:5432"
+migrate | No pending migrations to apply.
+app     | Connected to PostgreSQL
+app     | Resource Hub listening on port 3000 (development)
+```
+
+| Image | Size |
+|---|---|
+| `cs763-resource-hub-app` (runtime stage) | 452 MB |
+| `cs763-resource-hub-migrate` (build stage) | 1.2 GB |
