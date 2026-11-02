@@ -8,7 +8,7 @@ This log records every prompt given to the AI developer agent that produced code
 
 | Field | Value |
 |---|---|
-| Agent | Claude Code 2.1.312 (native install, WSL2 Ubuntu 24.04.5) |
+| Agent | Claude Code 2.1.312 (native install, WSL2 Ubuntu 24.04.5); 2.1.316 was installed on 2026-11-02 after this session started (see Agent_environment.md §1.1) |
 | Model | Opus 5.5 (`claude-opus-5-5`), effort `high` |
 | Permission mode | auto |
 | Session | PA1 setup session, started 2026-10-28 |
