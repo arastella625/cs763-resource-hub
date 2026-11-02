@@ -60,16 +60,37 @@ Organization and email fields are omitted here; they identify the author's perso
 |---|---|---|
 | Model | Claude Opus 5.5, model ID `claude-opus-5-5` | `.claude/settings.json` (`"model"`), confirmed by the agent's system context |
 | Effort level | `high` | `~/.claude/settings.json` → `modelSettings.claude-opus-5-5.effortLevel` |
-| Extended thinking | Managed by Claude Code according to the effort level; not separately configured | defaults |
-| Fast mode | Off (never toggled with `/fast`) | not shown by `/status`; **TODO:** confirm in `/config` |
+| Extended thinking | On; Claude Code does not allow turning it off for Opus 5.5. Depth follows the effort level. | `/config` → Thinking mode: true |
+| Fast mode | Off | `/config` → Fast mode (Opus 5.5): false |
 | Temperature, top-p, top-k, max tokens | Not exposed by Claude Code; Anthropic-managed defaults | n/a |
 | Model knowledge cutoff | June 2026 (as stated in the agent's system context) | system context |
+
+### 2.1 `/config` capture (2026-11-02 11:47 ET)
+
+Settings that can affect agent behavior or reproducibility:
+
+| Setting | Value |
+|---|---|
+| Thinking mode | true (cannot be turned off for Opus 5.5) |
+| Fast mode (Opus 5.5) | false |
+| Default permission mode | Manual (auto selected per session) |
+| Use auto mode during plan | true |
+| Auto-compact / Idle compaction | true / true |
+| Continue automatically at usage limit | true |
+| Dynamic workflows | false (size: small, default) |
+| Ultracode keyword trigger | true (never used) |
+| Output style | default |
+| Language | Default (English) |
+| Rewind code (checkpoints) | true |
+| Prompt suggestions / Session recap | true / true |
+| Artifacts | true |
+| Auto-update channel | disabled (set by env: `DISABLE_AUTOUPDATER`) |
 
 ## 3. Permission mode and tools
 
 | Setting | Value |
 |---|---|
-| Permission mode | **auto**. Tool calls run without per-call prompts, and a classifier blocks actions it judges risky. |
+| Permission mode | **auto** for all PA1 sessions. Tool calls run without per-call prompts, and a classifier blocks actions it judges risky. The saved default (`/config` → Default permission mode) is **Manual**, so auto mode was switched on in each session rather than set in a settings file. |
 | `permissions.allow` / `permissions.deny` rules | None (no rules in user or project settings) |
 | `settings.local.json` | None (user or project) |
 | Classifier denials during PA1 | 1: downloading and executing a `jq` binary from GitHub during Task 4 local testing. The agent did not work around it (see Prompt_test_log.md Entry 3). |
@@ -168,6 +189,7 @@ Rationale for the project settings: they pin the model across PA1–PA4, and the
 ## 9. Reproducing this environment for PA2/PA3
 
 1. Launch `claude` from the repository root so `.claude/settings.json` applies.
-2. Run `/status` at the start of each session and record the version, model and permission mode in Prompt_test_log.md.
-3. Keep CLAUDE.md, memory, hooks and MCP servers absent (PA2). Any PA3 security guidance goes in the prompts themselves, and the prompts are logged verbatim.
-4. Do not invoke `security-review` or `code-review` during the PA2 build.
+2. Switch to auto permission mode at the start of each session (the saved default is Manual), and confirm the mode in the log.
+3. Run `/status` at the start of each session and record the version, model and permission mode in Prompt_test_log.md.
+4. Keep CLAUDE.md, memory, hooks and MCP servers absent (PA2). Any PA3 security guidance goes in the prompts themselves, and the prompts are logged verbatim.
+5. Do not invoke `security-review` or `code-review` during the PA2 build.
