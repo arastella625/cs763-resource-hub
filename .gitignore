@@ -26,3 +26,4 @@ Thumbs.db
 
 # Prisma generated client
 src/generated/
+reports/

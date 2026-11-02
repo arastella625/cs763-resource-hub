@@ -283,3 +283,100 @@ app     | Resource Hub listening on port 3000 (development)
 |---|---|
 | `cs763-resource-hub-app` (runtime stage) | 452 MB |
 | `cs763-resource-hub-migrate` (build stage) | 1.2 GB |
+
+---
+
+## Entry 3: DevSecOps pipeline
+
+**Timestamp:** 2026-11-02 11:16 EST
+**Session:** PA1 setup session 2 (resumed)
+
+### Prompt (verbatim)
+
+> lets finish assignment 1 now
+
+This continued with Task 4 of the PA1 handoff prompt, which reads:
+
+> **Task 4: The DevSecOps pipeline.**
+> - Create `.github/workflows/devsecops.yml`, triggered on push and pull_request to main. Jobs: install, build and test; Docker image build; Trivy filesystem scan (dependencies) and Trivy image scan; Semgrep; SonarQube Cloud scan.
+> - Make every scan non-blocking (for example `exit-code: 0` or `continue-on-error: true`), but still upload results as SARIF and/or workflow artifacts so findings are visible.
+> - Add `sonar-project.properties` for SonarQube Cloud.
+> - Walk me through creating the SonarQube Cloud project (signing in with GitHub, importing the repo) and adding `SONAR_TOKEN` as a GitHub Actions secret. Give me exact click steps; I'll do this part myself.
+> CHECKPOINT.
+
+### Generated
+
+**Summary.** The agent wrote `.github/workflows/devsecops.yml` with six jobs, two job-summary scripts, `sonar-project.properties`, and a `test:coverage` script (Vitest v8 coverage, lcov output for SonarQube). Before writing the workflow, it ran every scanner locally against the repo and the runtime image to validate the rule sets and flags. Afterwards it linted the workflow with actionlint and shellcheck, and replayed each scan step on a clean copy of the repo.
+
+**Files created or changed:** `.github/workflows/devsecops.yml`, `.github/scripts/trivy-summary.sh`, `.github/scripts/semgrep-summary.sh`, `sonar-project.properties`, `vitest.config.ts` (coverage), `package.json` (`test:coverage`, `@vitest/coverage-v8` 5.0.5), `.gitignore` (`reports/`).
+
+**Pipeline design**
+
+| Job | Needs | What it does | Blocking? |
+|---|---|---|---|
+| `build-test` | none | `npm ci`, lint, build, typecheck, tests with coverage; uploads `coverage` artifact | yes |
+| `docker-image` | build-test | Buildx builds the `runtime` target (GHA layer cache), uploads the image tar | yes |
+| `trivy-fs` | none | Trivy `fs` with `vuln,secret,misconfig` scanners (npm lockfile, secrets, Dockerfile) | no |
+| `trivy-image` | docker-image | Trivy `image --input image.tar` (OS packages, Node runtime, node_modules) | no |
+| `semgrep` | none | Semgrep with `p/default`, `p/owasp-top-ten`, `p/nodejs`, `p/typescript`, `p/dockerfile`, `p/secrets` | no |
+| `sonarqube` | build-test | SonarQube Cloud scan with coverage; skipped with a warning if `SONAR_TOKEN` is unset | no |
+
+Non-blocking is enforced in two layers: scanners run with `--exit-code 0` (Trivy) or without `--error` (Semgrep), and each scan job sets `continue-on-error: true`. Each scan writes JSON and SARIF reports, uploads them as workflow artifacts, and writes a severity table to the job summary. SARIF upload to GitHub code scanning is included but gated on the repo variable `ENABLE_CODE_SCANNING`, because code scanning is not enabled on this private repository (`gh api .../code-scanning/alerts` returned 403).
+
+**Tooling choices**
+
+- Trivy 0.76.1 and Semgrep 1.183.0 run from their pinned official Docker images (`aquasec/trivy:0.76.1`, `semgrep/semgrep:1.183.0`), the same images used for local validation, instead of wrapper actions.
+- All GitHub Actions are pinned to full commit SHAs, with the release tag in a comment (`actions/checkout` v7.0.1, `setup-node` v7.1.0, `upload-artifact` v7.0.2, `download-artifact` v8.0.2, `docker/setup-buildx-action` v4.4.1, `docker/build-push-action` v7.4.0, `github/codeql-action/upload-sarif` v4.39.1, `SonarSource/sonarqube-scan-action` v8.4.0).
+- Workflow-level `permissions: contents: read`; `security-events: write` only on the jobs that can upload SARIF.
+
+**Workflow excerpt** (Trivy image job)
+
+```yaml
+  trivy-image:
+    name: Trivy image scan
+    needs: docker-image
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      ...
+      - name: Trivy image scan
+        run: |
+          mkdir -p reports
+          trivy() { docker run --rm -v "$PWD:/src" -v "$RUNNER_TEMP:/images:ro" -w /src "$TRIVY_IMAGE" "$@"; }
+          trivy image --input /images/image.tar --scanners vuln,secret --exit-code 0 \
+            --format json --output reports/trivy-image.json
+          trivy convert --format sarif --output reports/trivy-image.sarif reports/trivy-image.json
+          trivy convert --format table --severity HIGH,CRITICAL reports/trivy-image.json
+```
+
+**`sonar-project.properties`**
+
+```properties
+sonar.organization=arastella625
+sonar.projectKey=arastella625_cs763-resource-hub
+sonar.sources=src,Dockerfile
+sonar.tests=tests
+sonar.exclusions=src/generated/**
+sonar.javascript.lcov.reportPaths=coverage/lcov.info
+```
+
+### Verification (local, before the first CI run)
+
+| Check | Result |
+|---|---|
+| `actionlint` 1.7.12 (includes shellcheck on `run:` blocks) | 0 issues |
+| `shellcheck` on `.github/scripts/*.sh` | 0 issues |
+| Every Semgrep registry rule set resolves | 262 rules on 26 files |
+| Each scan step replayed on a clean copy of the repo | all exit 0; JSON + SARIF 2.1.0 written |
+| `npm run test:coverage` | `coverage/lcov.info` with repo-relative paths |
+
+Baseline findings from the local replay:
+
+| Scanner | Findings |
+|---|---|
+| Trivy fs: npm dependencies | 0 vulnerabilities |
+| Trivy fs: Dockerfile | 2 misconfigurations: DS-0002 HIGH (no non-root `USER`), DS-0026 LOW (no `HEALTHCHECK`) |
+| Trivy image: `node:24.22.2-slim` (Debian 12.15) OS packages and Node.js runtime | 235 vulnerabilities: 1 critical, 38 high, 110 medium, 84 low, 2 unknown |
+| Semgrep | 1: `dockerfile.security.missing-user` (ERROR), `Dockerfile:40` |
+
+One step could not be checked locally: the auto-mode permission classifier blocked downloading a `jq` binary, so the two summary scripts (which use the `jq` preinstalled on GitHub runners) are first exercised in CI. Their field paths were cross-checked against the real reports with Node.
