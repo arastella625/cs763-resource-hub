@@ -376,7 +376,38 @@ Baseline findings from the local replay:
 |---|---|
 | Trivy fs: npm dependencies | 0 vulnerabilities |
 | Trivy fs: Dockerfile | 2 misconfigurations: DS-0002 HIGH (no non-root `USER`), DS-0026 LOW (no `HEALTHCHECK`) |
-| Trivy image: `node:24.22.2-slim` (Debian 12.15) OS packages and Node.js runtime | 235 vulnerabilities: 1 critical, 38 high, 110 medium, 84 low, 2 unknown |
+| Trivy image: `node:24.22.2-slim` base image (Debian 12.15 OS packages, plus the npm CLI bundled in the base image) | 235 vulnerabilities: 1 critical, 38 high, 110 medium, 84 low, 2 unknown |
 | Semgrep | 1: `dockerfile.security.missing-user` (ERROR), `Dockerfile:40` |
 
 One step could not be checked locally: the auto-mode permission classifier blocked downloading a `jq` binary, so the two summary scripts (which use the `jq` preinstalled on GitHub runners) are first exercised in CI. Their field paths were cross-checked against the real reports with Node.
+
+---
+
+## Entry 4: Push and verify the pipeline
+
+**Timestamp:** 2026-11-02 11:37 EST
+**Session:** PA1 setup session 2
+
+### Prompt (verbatim)
+
+> push
+
+This approved pushing to GitHub and continuing with Task 5 of the PA1 handoff prompt (run the pipeline, fix failures, save evidence of a successful run).
+
+### Generated
+
+No application code. The agent pushed `main` (`86f70e6..aa141bc`), which triggered workflow run [41482256156](https://github.com/arastella625/cs763-resource-hub/actions/runs/41482256156). The run passed on the first attempt: all 6 jobs succeeded, and every step ran (SARIF upload to code scanning was skipped by design).
+
+`gh run watch` failed with `HTTP 403: Resource not accessible by personal access token` on the check-run annotations endpoint (the fine-grained token has no Checks permission), so the agent polled `gh run view` instead.
+
+The agent exported the full run log, run metadata and all scan report artifacts to `pipeline-logs/run-41482256156/`, and wrote `pipeline-logs/README.md` summarizing the results:
+
+| Scanner | Findings (non-blocking) |
+|---|---|
+| Semgrep (266 rules) | 1: `dockerfile.security.missing-user` |
+| SonarQube Cloud | Analysis successful; results on the SonarQube Cloud dashboard |
+| Trivy fs: npm dependencies | 0 vulnerabilities |
+| Trivy fs: Dockerfile | 2 misconfigurations (DS-0002 HIGH, DS-0026 LOW) |
+| Trivy image | 235 vulnerabilities (1 critical, 38 high) in the Debian 12 base image and its bundled npm CLI |
+
+While checking the reports, the agent corrected its Entry 3 description of the image findings: the 19 "Node.js" findings are in the npm CLI bundled in the base image, not the Node.js runtime.

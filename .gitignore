@@ -26,4 +26,6 @@ Thumbs.db
 
 # Prisma generated client
 src/generated/
-reports/
+/reports/
+!pipeline-logs/**/*.log
+!pipeline-logs/**/coverage/
