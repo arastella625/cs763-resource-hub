@@ -8,6 +8,17 @@ A cloud-native backend service that manages software license keys and cloud cred
 - **Stack:** Node.js + TypeScript (Express), PostgreSQL, Docker
 - **Pipeline:** GitHub Actions with Trivy, Semgrep and SonarQube Cloud
 
+## PA1 deliverables
+
+| Deliverable | File |
+|---|---|
+| Service specification | [spec.md](spec.md) |
+| Agent environment | [Agent_environment.md](Agent_environment.md) |
+| Prompt test log | [Prompt_test_log.md](Prompt_test_log.md) |
+| DevSecOps pipeline | [.github/workflows/devsecops.yml](.github/workflows/devsecops.yml), [sonar-project.properties](sonar-project.properties) |
+| Docker | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml), [.env.example](.env.example) |
+| Pipeline execution log | [pipeline-logs/](pipeline-logs/README.md) |
+
 ## Running locally
 
 ```bash
