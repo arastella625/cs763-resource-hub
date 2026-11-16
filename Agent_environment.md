@@ -91,7 +91,7 @@ Settings that can affect agent behavior or reproducibility:
 | Setting | Value |
 |---|---|
 | Permission mode | **auto** for all PA1 sessions. Tool calls run without per-call prompts, and a classifier blocks actions it judges risky. The saved default (`/config` → Default permission mode) is **Manual**, so auto mode was switched on in each session rather than set in a settings file. |
-| `permissions.allow` / `permissions.deny` rules | None (no rules in user or project settings) |
+| `permissions.allow` / `permissions.deny` rules | PA1: none. **From PA2:** one project deny rule, `Read(**/spec.md)` (see §4). |
 | `settings.local.json` | None (user or project) |
 | Classifier denials during PA1 | 1: downloading and executing a `jq` binary from GitHub during Task 4 local testing. The agent did not work around it (see Prompt_test_log.md Entry 3). |
 
@@ -119,17 +119,24 @@ During PA1 the agent used only Bash, Read, Edit and Write. It did not use subage
 }
 ```
 
-**`.claude/settings.json`** (project scope, committed in `1e18153`)
+**`.claude/settings.json`** (project scope, committed in `1e18153`; deny rule added for PA2)
 
 ```json
 {
   "model": "claude-opus-5-5",
   "autoMemoryEnabled": false,
-  "disableClaudeAiConnectors": true
+  "disableClaudeAiConnectors": true,
+  "permissions": {
+    "deny": [
+      "Read(**/spec.md)"
+    ]
+  }
 }
 ```
 
 Rationale for the project settings: they pin the model across PA1–PA4, and they disable auto-memory and claude.ai connectors so no remembered or connected content can leak into the PA2 naive baseline.
+
+**PA2 deny rule.** The PA1 `spec.md` describes my own Phase 1 design, which includes access-scope rules, secret masking, upload checks and audit logging. PA2 must be built from the professor's master specification using functional-only prompts. If the agent read `spec.md`, those security rules would leak into the naive baseline. The deny rule blocks the Read tool (and, on a best-effort basis, Grep and Glob) from opening it. It does **not** block shell commands such as `cat spec.md`. As a backstop, the PA2 prompt tells the agent to ignore `spec.md`, and after the run the exported transcript is searched for any access to `spec.md` (result recorded in Prompt_test_log.md).
 
 ## 5. Standing instructions and extensions
 
@@ -152,6 +159,12 @@ Rationale for the project settings: they pin the model across PA1–PA4, and the
 |---|---|---|---|
 | 1 (`e0626616-ef70-479d-83b8-c7f830f9474a`) | 2026-10-28 | `~` (home) | Task 1 environment check only, no code generated. claude.ai connectors were loaded and auto-memory was enabled (nothing was written to memory). Ended to fix Docker group membership and relaunch from the repo. Created `.claude/settings.json` to disable both. |
 | 2 (`31777d0d-2c49-4a47-a803-9b76e79d0080`, named "CS763 PA1 Resource Hub setup") | 2026-10-28, resumed 2026-11-02 | `~/cs763-resource-hub` | Tasks 2–7. Project settings in effect (no connectors, no memory). Claude Code 2.1.312 throughout. |
+
+### 6.1 Work done outside the agent of record
+
+| Date | Tool | What it did |
+|---|---|---|
+| 2026-11-16 | Claude Code in the Claude desktop app on Windows (Claude Opus 5.5), a planning/tutoring assistant, **not** the PA2 build agent | PA2 preparation only, with no application code: moved the PA1 scaffold into `functional-codebase/`, re-pointed the CI workflow (working directory, CI test database, Docker context, SonarQube base dir), fixed the `.gitignore` path for the generated Prisma client, added the `spec.md` deny rule, and drafted the PA2 generation prompt for my review. Committed as `AI:` on branch `pa2`. |
 
 ## 7. Host environment
 
@@ -188,7 +201,7 @@ Rationale for the project settings: they pin the model across PA1–PA4, and the
 
 ## 9. Reproducing this environment for PA2/PA3
 
-1. Launch `claude` from the repository root so `.claude/settings.json` applies.
+1. Launch `claude` from the repository root so `.claude/settings.json` applies. Since PA2 the application code is in `functional-codebase/`; the prompts direct the agent there.
 2. Switch to auto permission mode at the start of each session (the saved default is Manual), and confirm the mode in the log.
 3. Run `/status` at the start of each session and record the version, model and permission mode in Prompt_test_log.md.
 4. Keep CLAUDE.md, memory, hooks and MCP servers absent (PA2). Any PA3 security guidance goes in the prompts themselves, and the prompts are logged verbatim.

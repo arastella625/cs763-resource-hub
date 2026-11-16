@@ -25,7 +25,7 @@ npm-debug.log*
 Thumbs.db
 
 # Prisma generated client
-src/generated/
+**/src/generated/
 /reports/
 !pipeline-logs/**/*.log
 !pipeline-logs/**/coverage/

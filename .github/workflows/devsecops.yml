@@ -31,6 +31,25 @@ jobs:
   build-test:
     name: Install, build and test
     runs-on: ubuntu-24.04
+    # Since PA2 the application lives in functional-codebase/.
+    defaults:
+      run:
+        working-directory: functional-codebase
+    # Throwaway database for the API integration tests (CI only, never deployed).
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: resource_hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d resource_hub_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/resource_hub_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -38,18 +57,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: functional-codebase/package-lock.json
 
       - run: npm ci
       - run: npm run lint
       - run: npm run build
       - run: npm run typecheck
+      - run: npx prisma migrate deploy
       - run: npm run test:coverage
 
       - name: Upload coverage
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage
-          path: coverage/lcov.info
+          path: functional-codebase/coverage/lcov.info
           retention-days: 14
 
   docker-image:
@@ -64,7 +85,7 @@ jobs:
       - name: Build runtime image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: .
+          context: functional-codebase
           target: runtime
           tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           outputs: type=docker,dest=${{ runner.temp }}/image.tar
@@ -213,11 +234,15 @@ jobs:
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage
-          path: coverage
+          path: functional-codebase/coverage
 
+      # sonar-project.properties lives in functional-codebase/, so all paths in it
+      # (and in lcov.info) stay relative to the application folder.
       - name: SonarQube Cloud scan
         if: env.SONAR_TOKEN != ''
         uses: SonarSource/sonarqube-scan-action@4d1dc0c91ee400dcf8a6dddf2f705ac36542e304 # v8.4.0
+        with:
+          projectBaseDir: functional-codebase
 
       - name: Summary
         if: always()

@@ -15,13 +15,16 @@ A cloud-native backend service that manages software license keys and cloud cred
 | Service specification | [spec.md](spec.md) |
 | Agent environment | [Agent_environment.md](Agent_environment.md) |
 | Prompt test log | [Prompt_test_log.md](Prompt_test_log.md) |
-| DevSecOps pipeline | [.github/workflows/devsecops.yml](.github/workflows/devsecops.yml), [sonar-project.properties](sonar-project.properties) |
-| Docker | [Dockerfile](Dockerfile), [docker-compose.yml](docker-compose.yml), [.env.example](.env.example) |
+| DevSecOps pipeline | [.github/workflows/devsecops.yml](.github/workflows/devsecops.yml), [sonar-project.properties](functional-codebase/sonar-project.properties) |
+| Docker | [Dockerfile](functional-codebase/Dockerfile), [docker-compose.yml](functional-codebase/docker-compose.yml), [.env.example](functional-codebase/.env.example) |
 | Pipeline execution log | [pipeline-logs/](pipeline-logs/README.md) |
+
+Since PA2, the application (source, tests, Prisma, Docker files) lives in [functional-codebase/](functional-codebase/). The `pa1` tag keeps the original root layout.
 
 ## Running locally
 
 ```bash
+cd functional-codebase
 cp .env.example .env          # placeholder values; adjust if needed
 docker compose up --build     # db + migrate job + app
 curl localhost:3000/api/v1/health
