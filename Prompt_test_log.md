@@ -420,7 +420,7 @@ From PA2 on, the application lives in `functional-codebase/`, and the master spe
 
 ## Entry 5: Generate the functional baseline from the master spec
 
-**Timestamp:** 2026-11-16 17:39 EST (logged before the prompt was sent)
+**Timestamp:** 2026-11-16 17:39 EST. The entry was written before the prompt was sent, but it was committed (`8ef4326`, 17:40:44) after the agent had already started. The agent noticed the new commit mid-run and left it alone.
 **Session:** PA2 build session 1, ID `9afc6f30-7f87-4867-b5e9-d59278e0a9d5`
 **Agent:** Claude Code 2.1.316, launched from the repository root (`/home/bestg/cs763-resource-hub`)
 **Branch / start commit:** `pa2` at `f84f138`
@@ -552,16 +552,51 @@ ambiguous, choose a reasonable interpretation and list each assumption in README
 
 ### Generated
 
-_Pending: fill in after the run._ Commits the agent made (`git log --oneline f84f138..pa2`), the files it created, models and endpoints, and its README assumptions.
+The agent finished in one session (about 16 minutes) and made 6 commits on `pa2`. Nothing outside `functional-codebase/` changed, and it added no dependencies.
+
+| Commit | Time (EST) | Message |
+|---|---|---|
+| `db5c5b2` | 17:42 | AI: data model and initial migration |
+| `ef84b56` | 17:49 | AI: asset, ticket and allocation API |
+| `17b2e25` | 17:49 | AI: mock data and seed |
+| `700c460` | 17:53 | AI: integration tests |
+| `18e5c5b` | 17:56 | AI: docker compose seeding |
+| `fb3b30f` | 17:57 | AI: functional-codebase README |
+
+About 3,500 lines in 43 files:
+
+- **Data model:** 8 Prisma models (`Person`, `Course`, `ResearchLab`, `Asset`, `Ticket`, `TicketItem`, `TicketEvent`, `Allocation`) and 6 enums. There is one migration (`20261116000000_init`), and the agent added 6 hand-written `CHECK` constraints to it: stock and voucher credit never negative or above total, quantity > 0, and exactly one of course or lab per ticket.
+- **API:** every endpoint and verb in the master spec, organized as route → Zod validation → service → repository, with a central error handler and JSON-line request and event logs. Only `POST .../allocate` changes inventory. It does so in one transaction with a status-guarded ticket claim and conditional stock deductions, so a run that hits a shortage changes nothing.
+- **Mock data and seed:** JSON files in `mock-data/` (9 people, 4 courses, 3 labs, 13 assets, 10 tickets, 7 allocations, according to the agent). The compose `migrate` job now runs `prisma db seed` after migrating.
+- **Tests:** 48 Vitest + Supertest integration tests against the real database, covering the full ticket flow, all-or-nothing allocation, voucher credit, concurrent allocate, overdue and late returns. The agent reported 88% line coverage.
+- **README:** run, test and `curl` instructions, plus 17 numbered assumptions. Assumption 1: "No authentication. The specification defines none. Identity is supplied in the request body (`requesterId` on ticket creation, `actorId` on transitions, allocation and returns) and checked against the `Person` table and its role. This is a functional baseline, not an access-control design."
+- **Headers:** every source and test file starts with the requested header. Two files have none, as the agent noted: `migration_lock.toml`, which Prisma generates as "do not edit", and the JSON mock data, since JSON has no comments.
 
 ### Follow-up prompts
 
-_None yet._ Log each follow-up verbatim with a timestamp. Iteration count: 1 so far.
+None. The first prompt produced a complete, passing build. Iteration count: 1.
 
 ### Verification
 
-_Pending:_ `docker compose up --build`, `npm test`, a few `curl` calls, and the transcript check for any attempt to read `spec.md`.
+By Amber, 2026-11-16 at about 18:02 EST, on `pa2` at `fb3b30f`:
+
+| Check | Result |
+|---|---|
+| `docker compose up --build -d` | Images built, `db` healthy, `migrate` (migrate + seed) exited successfully, `app` running |
+| `curl /api/v1/assets` and `/api/v1/assets/tickets` | Returned the seeded assets and tickets |
+| `npm test` | 4 files, **48/48 passed** (3.76 s) |
+| Transcript check for any read of `spec.md` (Read tool or `cat`) | **None found.** The PA1 spec did not reach the build |
+| Transcript secrets scan | Only placeholder values: `change-me-local-only` from `.env.example`, `ci:ci` from the CI workflow, and `${...}` template variables. No API keys or tokens |
+
+The raw transcript is saved as `.ai_logs/pa2-session-1.jsonl`. The account email appeared 3 times: twice in the session context that Claude Code adds by itself, and once in a `git log` author line. All three are replaced with `<redacted-email>`.
 
 ### Unprompted agent behaviour
 
-_Pending:_ anything the agent added that the prompt did not ask for (for example request parsing with the existing `zod` dependency).
+The prompt deliberately said nothing about security, validation or integrity. The agent still added:
+
+- Zod `strictObject` validation on every body, path parameter and query string (unknown fields rejected, length limits, UUID checks, page size capped at 200), using the `zod` dependency already in the scaffold.
+- Database `CHECK` constraints, and concurrency guards (status-conditional updates) on allocate, return, edit and every ticket transition.
+- Role checks (the IT director approves, an admin allocates, only the course instructor or lab advisor can request) and a `TicketEvent` audit trail.
+- Tokens generated with `crypto.randomBytes`, a generic 500 error message with no stack trace, and a 100 kb JSON body limit.
+
+It did **not** add authentication. The role checks trust an `actorId` that the caller supplies in the request body, and the agent recorded this as an assumption rather than a risk. That gap is the starting point for the PA2 triage.
