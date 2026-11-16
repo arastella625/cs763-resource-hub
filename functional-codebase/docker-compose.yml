@@ -1,3 +1,11 @@
+# Stack: TypeScript / Node 24 / Express 5 / Prisma 7 / PostgreSQL
+# Tool: Claude Code (claude-opus-5-5)
+# Prompt Summary: PA2 functional baseline — PostgreSQL, one-shot migrate + seed job, and the app
+# AI Contribution: ~100% (generated)
+# Human Modifications: none yet
+# Verification: pending human review
+# Confidence: pending
+
 services:
   db:
     image: postgres:17
@@ -16,8 +24,10 @@ services:
       retries: 10
       start_period: 10s
 
-  # One-shot job: applies Prisma migrations, then exits. Uses the build stage,
-  # which has the Prisma CLI, so the runtime image stays production-only.
+  # One-shot job: applies Prisma migrations and loads the mock data, then exits.
+  # The seed only inserts records that do not exist yet, so restarts keep live data.
+  # Uses the build stage, which has the Prisma CLI and tsx, so the runtime image
+  # stays production-only.
   migrate:
     build:
       context: .
@@ -25,7 +35,7 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    command: ["npx", "prisma", "migrate", "deploy"]
+    command: ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed"]
     depends_on:
       db:
         condition: service_healthy

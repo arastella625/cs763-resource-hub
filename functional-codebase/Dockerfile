@@ -1,4 +1,12 @@
 # syntax=docker/dockerfile:1
+# Stack: TypeScript / Node 24 / Express 5 / Prisma 7 / PostgreSQL
+# Tool: Claude Code (claude-opus-5-5)
+# Prompt Summary: PA2 functional baseline — multi-stage image; build stage also carries mock data and the seed for the compose migrate job
+# AI Contribution: ~100% (generated)
+# Human Modifications: none yet
+# Verification: pending human review
+# Confidence: pending
+
 
 ARG NODE_VERSION=24.22.2
 
@@ -17,6 +25,9 @@ COPY tsconfig.json tsconfig.build.json prisma.config.ts ./
 COPY prisma ./prisma
 COPY src ./src
 RUN npm run build
+
+# Static mock data loaded by `prisma db seed` in the compose migrate job.
+COPY mock-data ./mock-data
 
 # ---- prod-deps: a clean production-only install ----
 # prisma and typescript are devDependencies but also optional peers of @prisma/client,
