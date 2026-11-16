@@ -93,7 +93,7 @@ export async function createTicket(input: CreateTicketInput) {
     }
   }
 
-  const ticket = await prisma.$transaction(async (tx) => {
+  const ticketId = await prisma.$transaction(async (tx) => {
     await validateItems(input.items, tx);
     const created = await tx.ticket.create({
       data: {
@@ -108,8 +108,10 @@ export async function createTicket(input: CreateTicketInput) {
       },
     });
     await recordEvent(tx, { ticketId: created.id, fromStatus: null, toStatus: TicketStatus.pending, actorId: requester.id, note: 'submitted' });
-    return loadTicket(created.id, tx);
+    return created.id;
   });
+  // Detail (with relation includes) is read after commit, outside the transaction connection.
+  const ticket = await loadTicket(ticketId);
 
   const body = serializeTicketDetail(ticket);
   logger.info('ticket_submitted', {
@@ -191,7 +193,7 @@ export async function updateTicket(id: string, input: UpdateTicketInput) {
     }
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     if (editsContent) {
       if (input.items) {
         await validateItems(input.items, tx);
@@ -246,10 +248,9 @@ export async function updateTicket(id: string, input: UpdateTicketInput) {
     );
     const previousIds = current.items.map((i) => i.assetId);
     await refreshAssetStatuses(tx, [...new Set([...assetIds, ...previousIds])]);
-    return loadTicket(id, tx);
   });
 
-  const body = serializeTicketDetail(updated);
+  const body = serializeTicketDetail(await loadTicket(id));
   if (target) {
     logger.info('ticket_transition', {
       ticketId: id,

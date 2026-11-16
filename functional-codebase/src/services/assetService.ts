@@ -196,7 +196,7 @@ export async function returnAsset(assetId: string, input: ReturnAssetInput) {
   }
   const actor = await requireActor(input.actorId, [PersonRole.admin, PersonRole.it_director], 'Processing a return');
 
-  const allocation = await prisma.$transaction(async (tx) => {
+  const quantity = await prisma.$transaction(async (tx) => {
     const returnedAt = new Date();
     const closed = await tx.allocation.updateMany({
       where: {
@@ -218,18 +218,22 @@ export async function returnAsset(assetId: string, input: ReturnAssetInput) {
       }
       throw conflict(`Allocation ${input.allocationId} is already ${existing.status}`);
     }
-    const row = await tx.allocation.findUniqueOrThrow({ where: { id: input.allocationId }, include: allocationInclude });
-    await restoreStock(tx, assetId, row.quantity);
+    const { quantity: units } = await tx.allocation.findUniqueOrThrow({ where: { id: input.allocationId } });
+    await restoreStock(tx, assetId, units);
     await refreshAssetStatuses(tx, [assetId]);
-    return row;
+    return units;
   });
 
+  const allocation = await prisma.allocation.findUniqueOrThrow({
+    where: { id: input.allocationId },
+    include: allocationInclude,
+  });
   const result = serializeAllocation(allocation);
   logger.info('asset_returned', {
     assetId,
     allocationId: allocation.id,
     ticketId: allocation.ticketId,
-    quantity: allocation.quantity,
+    quantity,
     checkoutDurationHours: result.tracking?.checkoutDurationHours,
     returnedLate: result.tracking?.returnedLate,
     actorId: actor.id,

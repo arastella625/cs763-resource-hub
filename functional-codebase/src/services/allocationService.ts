@@ -30,7 +30,7 @@ const DAY_MS = 86_400_000;
 export async function allocateTicket(ticketId: string, input: AllocateTicketInput) {
   const actor = await requireActor(input.actorId, [PersonRole.admin], 'Executing an allocation');
 
-  const ticket = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     const now = new Date();
 
     // Claim the ticket first: the status guard makes a second, concurrent allocate fail.
@@ -44,17 +44,23 @@ export async function allocateTicket(ticketId: string, input: AllocateTicketInpu
       throw conflict(`Only approved tickets can be allocated; ticket is ${existing.status}`);
     }
 
-    const t = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId }, include: { items: { include: { asset: true } } } });
+    // Flat queries only: relation includes inside an interactive transaction make Prisma
+    // issue parallel queries on the single transaction connection.
+    const t = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    const items = await tx.ticketItem.findMany({ where: { ticketId }, orderBy: { id: 'asc' } });
+    const assets = await tx.asset.findMany({ where: { id: { in: items.map((i) => i.assetId) } } });
+    const assetById = new Map(assets.map((a) => [a.id, a]));
 
-    for (const item of t.items) {
-      const kind = kindOf(item.asset.category);
+    for (const item of items) {
+      const asset = assetById.get(item.assetId)!;
+      const kind = kindOf(asset.category);
       const credit = kind === 'voucher' ? (item.creditAmount ?? undefined) : undefined;
 
       const ok = await deductStock(tx, item.assetId, item.quantity, credit);
       if (!ok) {
         // Throwing rolls back every deduction made so far and the ticket claim.
         const fresh = await tx.asset.findUnique({ where: { id: item.assetId } });
-        throw conflict(`Insufficient inventory for ${item.asset.name}`, {
+        throw conflict(`Insufficient inventory for ${asset.name}`, {
           assetId: item.assetId,
           requestedUnits: item.quantity,
           availableStock: fresh?.retiredAt ? 0 : (fresh?.availableStock ?? 0),
@@ -63,7 +69,7 @@ export async function allocateTicket(ticketId: string, input: AllocateTicketInpu
         });
       }
 
-      const loanDays = item.loanDays ?? item.asset.checkoutPeriodDays ?? DEFAULT_CHECKOUT_PERIOD_DAYS;
+      const loanDays = item.loanDays ?? asset.checkoutPeriodDays ?? DEFAULT_CHECKOUT_PERIOD_DAYS;
       await tx.allocation.create({
         data: {
           ticketId,
@@ -89,11 +95,10 @@ export async function allocateTicket(ticketId: string, input: AllocateTicketInpu
       actorId: actor.id,
       note: input.note ?? null,
     });
-    await refreshAssetStatuses(tx, [...new Set(t.items.map((i) => i.assetId))]);
-    return (await findTicketDetail(ticketId, tx))!;
+    await refreshAssetStatuses(tx, [...assetById.keys()]);
   });
 
-  const body = serializeTicketDetail(ticket);
+  const body = serializeTicketDetail((await findTicketDetail(ticketId))!);
   logger.info('ticket_allocated', {
     ticketId,
     actorId: actor.id,
