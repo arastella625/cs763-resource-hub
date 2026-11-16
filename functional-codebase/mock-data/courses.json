@@ -1,0 +1,6 @@
+[
+  { "id": "22222222-0000-4000-8000-000000000001", "code": "CS763", "title": "Secure Software Development", "section": "A1", "term": "Fall 2026", "department": "Computer Science", "instructorId": "11111111-0000-4000-8000-000000000001" },
+  { "id": "22222222-0000-4000-8000-000000000002", "code": "CS777", "title": "Big Data Analytics", "section": "A1", "term": "Fall 2026", "department": "Computer Science", "instructorId": "11111111-0000-4000-8000-000000000002" },
+  { "id": "22222222-0000-4000-8000-000000000003", "code": "EC544", "title": "Networking the Physical World", "section": "A1", "term": "Fall 2026", "department": "Electrical & Computer Engineering", "instructorId": "11111111-0000-4000-8000-000000000002" },
+  { "id": "22222222-0000-4000-8000-000000000004", "code": "CS601", "title": "Web Application Development", "section": "O1", "term": "Fall 2026", "department": "Computer Science", "instructorId": "11111111-0000-4000-8000-000000000003" }
+]

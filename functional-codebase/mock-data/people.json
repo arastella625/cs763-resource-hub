@@ -1,0 +1,11 @@
+[
+  { "id": "11111111-0000-4000-8000-000000000001", "name": "Dr. Elena Park", "email": "epark@university.example", "role": "instructor" },
+  { "id": "11111111-0000-4000-8000-000000000002", "name": "Prof. Marcus Hale", "email": "mhale@university.example", "role": "instructor" },
+  { "id": "11111111-0000-4000-8000-000000000003", "name": "Dr. Hannah Weiss", "email": "hweiss@university.example", "role": "instructor" },
+  { "id": "11111111-0000-4000-8000-000000000004", "name": "Dr. Priya Raman", "email": "praman@university.example", "role": "faculty_advisor" },
+  { "id": "11111111-0000-4000-8000-000000000005", "name": "Prof. Tomas Ortega", "email": "tortega@university.example", "role": "faculty_advisor" },
+  { "id": "11111111-0000-4000-8000-000000000006", "name": "Dr. Grace Liu", "email": "gliu@university.example", "role": "faculty_advisor" },
+  { "id": "11111111-0000-4000-8000-000000000007", "name": "Jordan Blake", "email": "jblake@university.example", "role": "it_director" },
+  { "id": "11111111-0000-4000-8000-000000000008", "name": "Samira Khan", "email": "skhan@university.example", "role": "admin" },
+  { "id": "11111111-0000-4000-8000-000000000009", "name": "Chris Noel", "email": "cnoel@university.example", "role": "admin" }
+]

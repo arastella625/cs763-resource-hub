@@ -1,0 +1,5 @@
+[
+  { "id": "33333333-0000-4000-8000-000000000001", "name": "Secure Systems Lab", "department": "Computer Science", "facultyAdvisorId": "11111111-0000-4000-8000-000000000004" },
+  { "id": "33333333-0000-4000-8000-000000000002", "name": "IoT & Edge Computing Lab", "department": "Electrical & Computer Engineering", "facultyAdvisorId": "11111111-0000-4000-8000-000000000005" },
+  { "id": "33333333-0000-4000-8000-000000000003", "name": "Cloud Data Lab", "department": "Computer Science", "facultyAdvisorId": "11111111-0000-4000-8000-000000000006" }
+]

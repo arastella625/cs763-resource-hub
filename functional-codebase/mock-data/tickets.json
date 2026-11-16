@@ -1,0 +1,163 @@
+[
+  {
+    "id": "55555555-0000-4000-8000-000000000001",
+    "title": "Burp Suite seats and YubiKeys for secure coding labs",
+    "description": "Weeks 9-14 web security labs need Burp Pro; YubiKeys for the signing and MFA assignment.",
+    "projectName": "Secure Coding Labs",
+    "priority": "high",
+    "status": "pending",
+    "requesterId": "11111111-0000-4000-8000-000000000001",
+    "courseId": "22222222-0000-4000-8000-000000000001",
+    "createdDaysAgo": 1,
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000001", "assetId": "44444444-0000-4000-8000-000000000009", "quantity": 10, "justification": "One seat per lab team" },
+      { "id": "66666666-0000-4000-8000-000000000002", "assetId": "44444444-0000-4000-8000-000000000006", "quantity": 10, "loanDays": 45, "justification": "Commit signing exercise" }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000002",
+    "title": "Edge boards and AWS credit for the fuzzing farm",
+    "description": "Distributed fuzzing on ARM edge hardware with results aggregated in AWS.",
+    "projectName": "Fuzzing Farm",
+    "priority": "normal",
+    "status": "pending",
+    "requesterId": "11111111-0000-4000-8000-000000000004",
+    "labId": "33333333-0000-4000-8000-000000000001",
+    "createdDaysAgo": 2,
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000003", "assetId": "44444444-0000-4000-8000-000000000005", "quantity": 2, "loanDays": 30, "justification": "ARM fuzzing targets" },
+      { "id": "66666666-0000-4000-8000-000000000004", "assetId": "44444444-0000-4000-8000-000000000011", "quantity": 2, "creditAmount": 1500, "justification": "Corpus storage and triage workers" }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000003",
+    "title": "Sensor kits for the smart campus project",
+    "description": "Each EC544 team builds a building-level sensing mesh.",
+    "projectName": "Smart Campus Sensors",
+    "priority": "high",
+    "status": "approved",
+    "requesterId": "11111111-0000-4000-8000-000000000002",
+    "courseId": "22222222-0000-4000-8000-000000000003",
+    "createdDaysAgo": 4,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 3, "note": "Approved for the full semester project" },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000005", "assetId": "44444444-0000-4000-8000-000000000003", "quantity": 15, "loanDays": 30, "justification": "Gateway node per team" },
+      { "id": "66666666-0000-4000-8000-000000000006", "assetId": "44444444-0000-4000-8000-000000000004", "quantity": 30, "loanDays": 30, "justification": "Two sensor nodes per team" }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000004",
+    "title": "GCP credit for genomics pipeline",
+    "projectName": "Genomics Pipeline",
+    "priority": "normal",
+    "status": "approved",
+    "requesterId": "11111111-0000-4000-8000-000000000006",
+    "labId": "33333333-0000-4000-8000-000000000003",
+    "createdDaysAgo": 3,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 1 },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000007", "assetId": "44444444-0000-4000-8000-000000000012", "quantity": 1, "creditAmount": 2000, "justification": "BigQuery and Batch for variant calling" }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000005",
+    "title": "MacBooks for the analytics dashboard teams",
+    "projectName": "Analytics Dashboards",
+    "priority": "low",
+    "status": "rejected",
+    "requesterId": "11111111-0000-4000-8000-000000000002",
+    "courseId": "22222222-0000-4000-8000-000000000002",
+    "createdDaysAgo": 9,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 8, "rejectionReason": "Request would take the entire MacBook pool; Dell laptops meet the course requirements" },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000008", "assetId": "44444444-0000-4000-8000-000000000002", "quantity": 8, "loanDays": 21 }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000006",
+    "title": "AWS credit and IntelliJ seats for Spark projects",
+    "description": "Term projects run Spark on EMR; students develop in IntelliJ.",
+    "projectName": "Spark Analytics Projects",
+    "priority": "high",
+    "status": "allocated",
+    "requesterId": "11111111-0000-4000-8000-000000000002",
+    "courseId": "22222222-0000-4000-8000-000000000002",
+    "createdDaysAgo": 10,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 9 },
+    "allocation": { "byId": "11111111-0000-4000-8000-000000000008", "daysAgo": 8 },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000009", "assetId": "44444444-0000-4000-8000-000000000011", "quantity": 10, "creditAmount": 5000,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000001", "token": "VCH-AWS7-K2QF-M9ZD-R4TX" } },
+      { "id": "66666666-0000-4000-8000-000000000010", "assetId": "44444444-0000-4000-8000-000000000008", "quantity": 40,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000002", "token": "LIC-JB4QZ-7HXMP-R2NTD-9KWFA-C3VYE" } }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000007",
+    "title": "Logic analyzers and Pi kits for protocol reverse engineering",
+    "projectName": "Edge Protocol Analysis",
+    "priority": "urgent",
+    "status": "allocated",
+    "requesterId": "11111111-0000-4000-8000-000000000005",
+    "labId": "33333333-0000-4000-8000-000000000002",
+    "createdDaysAgo": 14,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 13 },
+    "allocation": { "byId": "11111111-0000-4000-8000-000000000009", "daysAgo": 12 },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000011", "assetId": "44444444-0000-4000-8000-000000000007", "quantity": 2, "loanDays": 7,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000003", "token": "HW-SL8P-4XQ2-T7KD" } },
+      { "id": "66666666-0000-4000-8000-000000000012", "assetId": "44444444-0000-4000-8000-000000000003", "quantity": 10, "loanDays": 30,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000004", "token": "HW-RP5K-9MZT-2WQH" } }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000008",
+    "title": "Loaner laptops for online section students",
+    "projectName": "Capstone Web Apps",
+    "priority": "normal",
+    "status": "allocated",
+    "requesterId": "11111111-0000-4000-8000-000000000003",
+    "courseId": "22222222-0000-4000-8000-000000000004",
+    "createdDaysAgo": 6,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 5 },
+    "allocation": { "byId": "11111111-0000-4000-8000-000000000008", "daysAgo": 3 },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000013", "assetId": "44444444-0000-4000-8000-000000000001", "quantity": 5, "loanDays": 14,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000005", "token": "HW-DL74-QW8N-5ZRT" } }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000009",
+    "title": "Laptops and Azure credit for the threat modeling workshop",
+    "projectName": "Threat Modeling Workshop",
+    "priority": "normal",
+    "status": "closed",
+    "requesterId": "11111111-0000-4000-8000-000000000001",
+    "courseId": "22222222-0000-4000-8000-000000000001",
+    "createdDaysAgo": 30,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 29 },
+    "allocation": { "byId": "11111111-0000-4000-8000-000000000008", "daysAgo": 28 },
+    "closed": { "byId": "11111111-0000-4000-8000-000000000008", "daysAgo": 15, "note": "Workshop finished; all laptops returned" },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000014", "assetId": "44444444-0000-4000-8000-000000000001", "quantity": 3, "loanDays": 14,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000006", "token": "HW-DL74-8KMV-3PXA", "returnedDaysAgo": 16 } },
+      { "id": "66666666-0000-4000-8000-000000000015", "assetId": "44444444-0000-4000-8000-000000000013", "quantity": 3, "creditAmount": 600,
+        "allocation": { "id": "77777777-0000-4000-8000-000000000007", "token": "VCH-AZR3-T6YH-W2PL-N8QC" } }
+    ]
+  },
+  {
+    "id": "55555555-0000-4000-8000-000000000010",
+    "title": "MATLAB seats for radar signal research",
+    "projectName": "Passive Radar",
+    "priority": "low",
+    "status": "closed",
+    "requesterId": "11111111-0000-4000-8000-000000000005",
+    "labId": "33333333-0000-4000-8000-000000000002",
+    "createdDaysAgo": 21,
+    "review": { "byId": "11111111-0000-4000-8000-000000000007", "daysAgo": 20, "rejectionReason": "Department already holds a site license for this toolbox" },
+    "closed": { "byId": "11111111-0000-4000-8000-000000000005", "daysAgo": 19, "note": "Using the department site license instead" },
+    "items": [
+      { "id": "66666666-0000-4000-8000-000000000016", "assetId": "44444444-0000-4000-8000-000000000010", "quantity": 5 }
+    ]
+  }
+]
