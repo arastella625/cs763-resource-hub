@@ -411,3 +411,157 @@ The agent exported the full run log, run metadata and all scan report artifacts 
 | Trivy image | 235 vulnerabilities (1 critical, 38 high) in the Debian 12 base image and its bundled npm CLI |
 
 While checking the reports, the agent corrected its Entry 3 description of the image findings: the 19 "Node.js" findings are in the npm CLI bundled in the base image, not the Node.js runtime.
+
+---
+
+# PA2: Naive baseline build
+
+From PA2 on, the application lives in `functional-codebase/`, and the master specification (ProjectPortalDomainServices, Domain 2) replaces my PA1 `spec.md`. The build prompts are functional only: they deliberately leave out security, input validation and encryption. Repository preparation (layout, CI paths, the `spec.md` deny rule) was done before this entry in commit `f84f138`; see Agent_environment.md §6.1.
+
+## Entry 5: Generate the functional baseline from the master spec
+
+**Timestamp:** 2026-11-16 17:39 EST (logged before the prompt was sent)
+**Session:** PA2 build session 1, ID `9afc6f30-7f87-4867-b5e9-d59278e0a9d5`
+**Agent:** Claude Code 2.1.316, launched from the repository root (`/home/bestg/cs763-resource-hub`)
+**Branch / start commit:** `pa2` at `f84f138`
+
+### Environment check before the run
+
+`/status` (account email, organization name and local socket path removed):
+
+```text
+Session ID:        9afc6f30-7f87-4867-b5e9-d59278e0a9d5
+Session kind:      interactive
+cwd:               /home/bestg/cs763-resource-hub
+Login method:      Claude Pro account
+Cloud sessions:    GitHub connected
+Model:             claude-opus-5-5
+Setting sources:   User settings, Shared project settings
+Auto mode server:  Enabled
+```
+
+`/config`, settings that bear on the run:
+
+| Setting | Value |
+|---|---|
+| Default permission mode | Manual (auto mode switched on for this session) |
+| Output style | default |
+| Thinking mode | on (cannot be turned off for Opus 5.5) |
+| Fast mode | off |
+| Auto-compact / idle compaction | on / on |
+| Rewind code (checkpoints) | on |
+| Dynamic workflows | off |
+| Artifacts | on |
+| Auto-update channel | disabled (`DISABLE_AUTOUPDATER`) |
+
+| Check | Result |
+|---|---|
+| Model is `claude-opus-5-5` | ✅ (`/status`) |
+| Project settings loaded | ✅ ("Shared project settings" in setting sources) |
+| Permission mode is auto | ☐ confirm from the footer |
+| `/permissions` lists `Read(**/spec.md)` under Deny | ☐ confirm |
+| No claude.ai connectors loaded | ☐ confirm (`/mcp`) |
+
+### Prompt (verbatim)
+
+```text
+You are building a backend service in the functional-codebase/ folder of this repository.
+Work only inside functional-codebase/. That folder already contains a working Node 24 + TypeScript + Express 5 + Prisma 7 + PostgreSQL scaffold with
+a health endpoint, Vitest + Supertest tests, a multi-stage Dockerfile and docker-compose.
+Ignore spec.md at the repository root: it is an outdated draft and is superseded by the
+specification below.
+
+Implement the following specification completely.
+
+--- SPECIFICATION: The Resource Allocation & Help Desk Hub (Domain 2) ---
+This service handles the distribution of critical project assets, logging tracking
+parameters, software license keys, and cloud credit vouchers across active course groups
+and research labs.
+
+Functional Requirements:
+1. Asset Lifecycle & Inventory Allocation: Programmatically manage and monitor a pool of
+   physical lab equipment (hardware units, laptops, IoT nodes), software license keys, and
+   cloud credit vouchers. Each unique asset must be assigned a UUID, name, category, total
+   stock, and availability metrics. Assets are allocated directly to an overarching
+   academic course or research lab.
+2. Polymorphic Balance and Status Tracking: Process transactional balance logic for
+   heterogeneous assets. For cloud vouchers, it must manage strict numeric deduction
+   checks (preventing balances from dropping below zero) and log high-value alphanumeric
+   license tokens. For physical items, it must calculate active check-out duration
+   tracking rules and maintain status flags (available, reserved, checkedout, overdue).
+3. Help Desk Ticketing Pipeline: Process incoming resource requests from course
+   instructor or research lab faculty advisor. The service must parse multi-tiered
+   requests, track ticket lifecycles (pending, approved, rejected, allocated, closed),
+   update project asset allocations dynamically upon IT director sign-off, and output
+   comprehensive logging metrics.
+4. Explicit Inventory Allocation Engine: The system must decouple administrative ticket
+   review from physical inventory modification. Inventory values must only alter when a
+   separate, dedicated allocation execution command is processed by an administrator,
+   triggering atomic database deductions and issuing keys or hardware assignment tokens.
+5. Complex Multi-Field Query: Support rich administrative and group queries. Users can
+   search and filter the asset catalog and ticket logs simultaneously by status, asset
+   category, requesting research lab or course.
+
+REST APIs (base path /api/v1):
+- POST, GET  /api/v1/assets — Add an inventory asset item. Supplying multi-field search
+  query parameters allows administrators and teams to filter active inventory listings by
+  department program or availability state.
+- GET, PUT, DELETE  /api/v1/assets/{asset_id} — Read, update, and delete an inventory
+  asset item.
+- POST  /api/v1/assets/{asset_id}/return — Processes the return of a checked-out physical
+  device, increments the pool's remaining capacity stock, and records the return timestamp.
+- GET  /api/v1/assets/allocations — Read all active resource allocations, checked-out
+  inventory metrics, and assigned software keys for a specific requesting research lab or
+  course.
+- POST, GET  /api/v1/assets/tickets — Submit a new help desk resource request ticket or
+  read a listing of all active requests filtered dynamically by status
+  (pending/approved/allocated) or course section or project.
+- PUT, DELETE, GET  /api/v1/assets/tickets/{ticket_id} — Update a ticket's contents,
+  delete a pending request, or fetch specific ticket metrics. A PUT request targeting this
+  route handles the operational approval state transition.
+- POST  /api/v1/assets/tickets/{ticket_id}/allocate — Executes the real physical database
+  mutation. This endpoint processes an approved ticket, atomically subtracts items from
+  the main asset pool inventory, and establishes the active user allocation record.
+--- END SPECIFICATION ---
+
+Deliverables:
+1. Prisma models and a versioned migration for everything the specification needs.
+2. Static mock data in mock-data/ (courses, research labs, people, assets of every kind,
+   tickets in several states) and a seed step that loads it, so `docker compose up`
+   starts the app with data.
+3. Express routes, services and data access for every endpoint above.
+4. Integration tests (Vitest + Supertest against the real database) covering the happy
+   path of every endpoint and verb, including the full ticket flow
+   pending -> approved -> allocated -> closed and a physical device return.
+5. `docker compose up --build` builds and runs the app, and `npm test` passes.
+6. Every source and test file you create or change starts with this header comment,
+   filled in for that file:
+     // Stack: TypeScript / Node 24 / Express 5 / Prisma 7 / PostgreSQL
+     // Tool: Claude Code (claude-opus-5-5)
+     // Prompt Summary: PA2 functional baseline — <what this file does>
+     // AI Contribution: ~100% (generated)
+     // Human Modifications: none yet
+     // Verification: pending human review
+     // Confidence: pending
+7. Create functional-codebase/README.md with how to run, test, and call each endpoint.
+
+Work autonomously until the tests pass and the containers run. Commit in logical steps
+with messages starting "AI: " followed by the feature name. Where the specification is
+ambiguous, choose a reasonable interpretation and list each assumption in README.md.
+```
+
+### Generated
+
+_Pending: fill in after the run._ Commits the agent made (`git log --oneline f84f138..pa2`), the files it created, models and endpoints, and its README assumptions.
+
+### Follow-up prompts
+
+_None yet._ Log each follow-up verbatim with a timestamp. Iteration count: 1 so far.
+
+### Verification
+
+_Pending:_ `docker compose up --build`, `npm test`, a few `curl` calls, and the transcript check for any attempt to read `spec.md`.
+
+### Unprompted agent behaviour
+
+_Pending:_ anything the agent added that the prompt did not ask for (for example request parsing with the existing `zod` dependency).
