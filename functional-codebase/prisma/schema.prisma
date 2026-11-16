@@ -1,4 +1,11 @@
-// Prisma schema. Feature models (spec.md §3) are added in later phases.
+// Stack: TypeScript / Node 24 / Express 5 / Prisma 7 / PostgreSQL
+// Tool: Claude Code (claude-opus-5-5)
+// Prompt Summary: PA2 functional baseline — Prisma data model for courses, labs, people, assets, tickets and allocations
+// AI Contribution: ~100% (generated)
+// Human Modifications: none yet
+// Verification: pending human review
+// Confidence: pending
+//
 // The datasource URL is read from DATABASE_URL in prisma.config.ts.
 
 generator client {
@@ -10,4 +17,236 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums (values are lowercase so they match the API vocabulary 1:1)
+// ---------------------------------------------------------------------------
+
+enum PersonRole {
+  instructor
+  faculty_advisor
+  it_director
+  admin
+}
+
+/// hardware, laptop and iot_node are physical items; the other two are digital.
+enum AssetCategory {
+  hardware
+  laptop
+  iot_node
+  software_license
+  cloud_voucher
+}
+
+enum AssetStatus {
+  available
+  reserved
+  checkedout
+  overdue
+}
+
+enum TicketStatus {
+  pending
+  approved
+  rejected
+  allocated
+  closed
+}
+
+enum TicketPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum AllocationStatus {
+  checkedout // physical item currently out, within its loan period
+  overdue // physical item out past its due date
+  issued // license key or voucher code issued (digital, never returned)
+  returned // physical item returned to the pool
+}
+
+// ---------------------------------------------------------------------------
+// Groups and people
+// ---------------------------------------------------------------------------
+
+model Person {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String
+  email     String     @unique
+  role      PersonRole
+  createdAt DateTime   @default(now())
+
+  coursesTaught    Course[]      @relation("CourseInstructor")
+  labsAdvised      ResearchLab[] @relation("LabAdvisor")
+  ticketsRequested Ticket[]      @relation("TicketRequester")
+  ticketsReviewed  Ticket[]      @relation("TicketReviewer")
+  ticketsAllocated Ticket[]      @relation("TicketAllocator")
+  ticketEvents     TicketEvent[]
+  allocationsMade  Allocation[]  @relation("AllocationAllocator")
+  returnsReceived  Allocation[]  @relation("AllocationReturner")
+}
+
+model Course {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String // e.g. CS763
+  title        String
+  section      String // e.g. A1
+  term         String // e.g. Fall 2026
+  department   String
+  instructorId String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  instructor  Person       @relation("CourseInstructor", fields: [instructorId], references: [id])
+  tickets     Ticket[]
+  allocations Allocation[]
+
+  @@unique([code, section, term])
+}
+
+model ResearchLab {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @unique
+  department       String
+  facultyAdvisorId String   @db.Uuid
+  createdAt        DateTime @default(now())
+
+  facultyAdvisor Person       @relation("LabAdvisor", fields: [facultyAdvisorId], references: [id])
+  tickets        Ticket[]
+  allocations    Allocation[]
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+
+model Asset {
+  id                 String        @id @default(uuid()) @db.Uuid
+  name               String
+  category           AssetCategory
+  description        String?
+  department         String // owning department / program
+  totalStock         Int // units: devices, license seats or voucher codes
+  availableStock     Int // units currently in the pool
+  status             AssetStatus   @default(available)
+  checkoutPeriodDays Int? // physical items: default loan period
+  creditTotal        Decimal?      @db.Decimal(12, 2) // cloud vouchers: total credit in the pool
+  creditBalance      Decimal?      @db.Decimal(12, 2) // cloud vouchers: remaining credit (never < 0)
+  retiredAt          DateTime? // soft delete
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  ticketItems TicketItem[]
+  allocations Allocation[]
+
+  @@index([category, status])
+  @@index([department])
+}
+
+// ---------------------------------------------------------------------------
+// Help desk
+// ---------------------------------------------------------------------------
+
+model Ticket {
+  id              String         @id @default(uuid()) @db.Uuid
+  title           String
+  description     String?
+  projectName     String?
+  priority        TicketPriority @default(normal)
+  status          TicketStatus   @default(pending)
+  requesterId     String         @db.Uuid
+  courseId        String?        @db.Uuid
+  labId           String?        @db.Uuid
+  reviewedById    String?        @db.Uuid
+  reviewedAt      DateTime?
+  rejectionReason String?
+  allocatedById   String?        @db.Uuid
+  allocatedAt     DateTime?
+  closedAt        DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  requester   Person        @relation("TicketRequester", fields: [requesterId], references: [id])
+  course      Course?       @relation(fields: [courseId], references: [id])
+  lab         ResearchLab?  @relation(fields: [labId], references: [id])
+  reviewedBy  Person?       @relation("TicketReviewer", fields: [reviewedById], references: [id])
+  allocatedBy Person?       @relation("TicketAllocator", fields: [allocatedById], references: [id])
+  items       TicketItem[]
+  events      TicketEvent[]
+  allocations Allocation[]
+
+  @@index([status])
+  @@index([courseId])
+  @@index([labId])
+}
+
+/// One line of a multi-item request ticket.
+model TicketItem {
+  id            String   @id @default(uuid()) @db.Uuid
+  ticketId      String   @db.Uuid
+  assetId       String   @db.Uuid
+  quantity      Int
+  creditAmount  Decimal? @db.Decimal(12, 2) // cloud vouchers: total credit requested on this line
+  loanDays      Int? // physical items: requested loan period
+  justification String?
+
+  ticket     Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  asset      Asset       @relation(fields: [assetId], references: [id])
+  allocation Allocation?
+
+  @@index([ticketId])
+  @@index([assetId])
+}
+
+/// Audit log of ticket lifecycle transitions.
+model TicketEvent {
+  id         String        @id @default(uuid()) @db.Uuid
+  ticketId   String        @db.Uuid
+  fromStatus TicketStatus?
+  toStatus   TicketStatus
+  actorId    String?       @db.Uuid
+  note       String?
+  createdAt  DateTime      @default(now())
+
+  ticket Ticket  @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  actor  Person? @relation(fields: [actorId], references: [id])
+
+  @@index([ticketId])
+}
+
+// ---------------------------------------------------------------------------
+// Allocations (created only by the allocation engine)
+// ---------------------------------------------------------------------------
+
+model Allocation {
+  id            String           @id @default(uuid()) @db.Uuid
+  ticketId      String           @db.Uuid
+  ticketItemId  String           @unique @db.Uuid
+  assetId       String           @db.Uuid
+  courseId      String?          @db.Uuid
+  labId         String?          @db.Uuid
+  quantity      Int
+  creditAmount  Decimal?         @db.Decimal(12, 2)
+  token         String           @unique // license key, voucher code or hardware assignment token
+  status        AllocationStatus
+  allocatedById String           @db.Uuid
+  allocatedAt   DateTime         @default(now())
+  dueAt         DateTime?
+  returnedAt    DateTime?
+  returnedById  String?          @db.Uuid
+  returnNote    String?
+
+  ticket      Ticket       @relation(fields: [ticketId], references: [id])
+  ticketItem  TicketItem   @relation(fields: [ticketItemId], references: [id])
+  asset       Asset        @relation(fields: [assetId], references: [id])
+  course      Course?      @relation(fields: [courseId], references: [id])
+  lab         ResearchLab? @relation(fields: [labId], references: [id])
+  allocatedBy Person       @relation("AllocationAllocator", fields: [allocatedById], references: [id])
+  returnedBy  Person?      @relation("AllocationReturner", fields: [returnedById], references: [id])
+
+  @@index([assetId, status])
+  @@index([courseId])
+  @@index([labId])
 }
