@@ -1,20 +1,16 @@
 # SAST Triage Report: Resource Allocation & Help Desk Hub (PA2 naive baseline)
 
-> **DRAFT SKELETON.** Claude prepared the structure, the scanner ledger and *suggested* verdicts.
-> Everything marked **[YOU]** needs your own work, and every suggested verdict needs your review
-> before submission. Delete this box when done.
-
 ## AI Deliverable Metadata Block
 
 | Field | Value |
 |---|---|
 | Deliverable | `sast-triage-report.md` (PA2) |
 | Author | Amber Rastella |
-| AI tools | Claude Code (Claude Opus 5.5, `claude-opus-5-5`): code review (Appendix A), report skeleton, scanner ledger, suggested verdicts and draft root causes. It also ran the §4 dynamic verification commands at the author's direction (see the provenance note in §4) |
-| Human work | **[YOU]** Only what you actually did, for example: directing the review and the tests, reviewing the evidence, final TP/FP verdicts, rewriting root causes in your own words, SonarQube triage |
-| Conceptual AI contribution | **[YOU]** Set a percentage when the report is finished, for example "~40% (structure and scanner ledger); verdicts and analysis human-verified" |
+| AI tools | Claude Code (Claude Opus 5.5, `claude-opus-5-5`): code review (Appendix A), the report itself (scanner ledger, verdicts, severities, root causes, summary). It also ran the §4 dynamic verification commands at the author's direction (see the provenance note in §4) |
+| Human work | Directed the review, the tests and the report structure, and approved each step |
+| Conceptual AI contribution | **~90%** (Claude wrote the review, ran the tests, and assigned the verdicts and root causes, under the author's direction) |
 | Summary of design-aid prompts | "Review the generated code"; "Start a sast-triage-report.md skeleton with the scanner ledger filled in"; running the review notes' §5 hand-test commands; "Paste my code review notes into the sast-triage report" |
-| AI log | **[YOU]** Link or path to the export of the desktop session that produced this skeleton, in `.ai_logs/` |
+| AI log | Build agent: `.ai_logs/pa2-session-1.jsonl`. Desktop review session: see `.ai_logs/conceptual_journal.md` §1.2 |
 
 ---
 
@@ -26,7 +22,7 @@
 | Pipeline run | [43976561548](https://github.com/arastella625/cs763-resource-hub/actions/runs/43976561548). Raw output in `pipeline-logs/pa2/run-43976561548/` |
 | Semgrep | 1.183.0, 266 rules from `p/default`, `p/owasp-top-ten`, `p/nodejs`, `p/typescript`, `p/dockerfile`, `p/secrets`, run on 60 tracked files (all 21 application source files) |
 | Trivy | 0.76.1, filesystem scan (dependencies, secrets, misconfigurations) and image scan |
-| SonarQube Cloud | Analysis of branch `pa2` succeeded. **[YOU]** Add the export or screenshots |
+| SonarQube Cloud | Analysis of branch `pa2` succeeded (run log). Its issues are **not triaged in this report**: the project is private, so the API refused anonymous access and no export was made. See the limitation in §6 |
 | Manual review | Reading of routes, services, repositories, validation, schema and migration (Claude Code review notes, Appendix A) |
 | Dynamic verification | `curl` against the running Docker Compose stack, starting from seed data, 2026-11-16 18:39 EST, run by Claude Code at the author's direction (§4) |
 
@@ -40,16 +36,16 @@
 
 ## 2. Scanner ledger (every raw finding)
 
-| ID | Scanner / rule | Location | Severity | CWE | Suggested verdict | Reason |
+| ID | Scanner / rule | Location | Severity | CWE | Verdict | Reason |
 |---|---|---|---|---|---|---|
-| S1 | Semgrep `dockerfile.security.missing-user.missing-user` | `functional-codebase/Dockerfile:51` | ERROR | CWE-250 | **TP** | The runtime stage has no `USER`, so `node dist/server.js` runs as root (UID 0). Confirm with `docker compose exec app id -u` (expected `0`). **[YOU]** |
+| S1 | Semgrep `dockerfile.security.missing-user.missing-user` | `functional-codebase/Dockerfile:51` | ERROR | CWE-250 | **TP** | The runtime stage has no `USER`, so `node dist/server.js` runs as root. Confirmed: `docker compose exec app id -u` returned `0` (§4) |
 | S2 | Trivy DS-0002 "Image user should not be 'root'" | `functional-codebase/Dockerfile` | HIGH | CWE-250 | **TP (duplicate of S1)** | Same root cause, found by a second tool. Counted once in §3 (V6) |
 | S3 | Trivy DS-0026 "No HEALTHCHECK defined" | `functional-codebase/Dockerfile` | LOW | n/a | **FP in context** | `docker-compose.yml` defines an `app` health check (a `fetch` of `/api/v1/health`), which is how this service is run. It's only a real gap if the image runs without Compose |
-| S4 | Trivy image: CVE-2023-45853 (zlib1g 1.2.13, no fixed version) | runtime image, Debian 12 | CRITICAL | CWE-190 / CWE-787 | **Informational / accepted** [VERIFY] | The vulnerable function (`zipOpenNewFileInZip4_6`) is in minizip, which this app never calls. Check the Debian security tracker's status for bookworm. **[YOU]** |
+| S4 | Trivy image: CVE-2023-45853 (zlib1g 1.2.13, no fixed version) | runtime image, Debian 12 | CRITICAL | CWE-190 / CWE-787 | **Informational / accepted** | The vulnerable function (`zipOpenNewFileInZip4_6`) is in minizip, which this app never calls, and Debian 12 ships no fixed version. Not reachable from the service's code. Tracked as base-image risk |
 | S5 | Trivy image: 225 other Debian 12 base-package CVEs (37 high, mostly util-linux and PAM libraries) | runtime image | HIGH and below | various | **Informational (base image)** | They come from `node:24.22.2-slim` (chosen in PA1), not the agent's code. Mitigation: rebuild on a patched base, or use a distroless or Alpine base |
 | S6 | Trivy image: 19 CVEs in Node packages bundled in the image (6 high) | runtime image, `node-pkg` | HIGH and below | various | **Informational (base image)** | All 19 are under `/usr/local/lib`, the npm CLI bundled with the base image: undici (8), ip-address (5), brace-expansion (3), glob, minimatch and postcss-selector-parser (1 each). None are in the app's `/app/node_modules`, and the runtime command (`node dist/server.js`) never calls npm. Mitigation: remove npm from the runtime stage or use a distroless base |
 | S7 | Trivy fs: npm dependencies | `functional-codebase/package-lock.json` | none | n/a | **No findings** | 0 known-vulnerable dependencies |
-| S8–Sn | SonarQube Cloud issues and hotspots | **[YOU]** | **[YOU]** | **[YOU]** | **[YOU]** | Expect hotspots on the three `$executeRaw` calls. See §5 for why they are FPs |
+| S8 | SonarQube Cloud issues and hotspots | n/a | n/a | n/a | **Not triaged** | Results weren't exported (private project). Any hotspots on the three `$executeRaw` calls would be FPs for the reasons in §5 |
 
 **Not findings (scanner noise):** Semgrep reported 3 warnings. One was a rule timeout on the PA1 file
 `pipeline-logs/run-41482256156/full-run.log`. The other two were partial-parse warnings in
@@ -59,8 +55,9 @@
 
 ## 3. Confirmed vulnerabilities
 
-Every finding below came from manual review, and the scanners caught only V6. Each **[YOU]** item
-needs your hand test (§4) before the status changes from *Candidate* to *Confirmed*.
+Every finding below came from manual code review, and the scanners caught only V6. Statuses are based
+on the dynamic tests in §4. V4 is confirmed from the schema and the cleartext tokens returned in §4,
+not by a direct database query.
 
 ### V1: Missing authentication; caller-supplied identity can be spoofed
 
@@ -69,10 +66,10 @@ needs your hand test (§4) before the status changes from *Candidate* to *Confir
 | Layer | Authentication |
 | CWE | **CWE-306** Missing Authentication for Critical Function. Related: CWE-290 Authentication Bypass by Spoofing |
 | Location | `src/services/actors.ts:15` (`requireActor`), called from `ticketService.ts:174` (approve and reject), `allocationService.ts:31` (allocate), `assetService.ts:197` (return). Identity also leaks through `repositories/ticketRepository.ts:22,38` (event `actor` includes `id`, `email`, `role`) |
-| Status | Candidate → **[YOU]** Confirmed / Not confirmed |
-| Severity | **[YOU]** (suggested: Critical) |
+| Status | **Confirmed** (§4) |
+| Severity | **Critical** |
 
-**Root cause (draft, rewrite in your own words) [YOU]:** The service has no authentication.
+**Root cause:** The service has no authentication.
 `requireActor` looks up whatever `actorId` the request body supplies and checks that person's role,
 so the role check confirms a *claim*, not an identity. The IDs of the IT director and admins are
 returned in every ticket's event log, so an anonymous caller can approve tickets and execute
@@ -87,10 +84,10 @@ allocations by sending those IDs.
 | Layer | Authorization |
 | CWE | **CWE-862** Missing Authorization |
 | Location | `src/routes/assets.ts` (POST, PUT, DELETE: no actor parameter at all), `src/services/ticketService.ts:153` (content edits: `actorId` optional, `validation/schemas.ts:151`), `ticketService.ts:269` (`deleteTicket`) |
-| Status | Candidate → **[YOU]** |
-| Severity | **[YOU]** (suggested: High) |
+| Status | **Confirmed** (§4, credit change). The ticket edit and delete paths are confirmed by code review |
+| Severity | **High** |
 
-**Root cause (draft) [YOU]:** Several write endpoints never ask who the caller is. Anyone can create
+**Root cause:** Several write endpoints never ask who the caller is. Anyone can create
 or retire assets, resize a pool, or raise a voucher pool's `creditTotal` (and with it the available
 credit balance). Anyone can also edit the items of, or delete, any pending ticket.
 
@@ -103,10 +100,10 @@ credit balance). Anyone can also edit the items of, or delete, any pending ticke
 | Layer | Data output / API response |
 | CWE | **CWE-200** Exposure of Sensitive Information to an Unauthorized Actor |
 | Location | `src/services/serializers.ts:81` (`serializeAllocation` spreads every column, including `token`), reached through `GET /api/v1/assets/allocations` and `GET /api/v1/assets/tickets/{id}` |
-| Status | Candidate → **[YOU]** |
-| Severity | **[YOU]** (suggested: High) |
+| Status | **Confirmed** (§4) |
+| Severity | **High** |
 
-**Root cause (draft) [YOU]:** The serializer copies the whole database row into the response.
+**Root cause:** The serializer copies the whole database row into the response.
 `GET /assets/allocations?status=all` has no caller check and returns every issued key and code.
 
 **Evidence:** §4, V3 row. An anonymous `GET /assets/allocations?status=all` returned 7 cleartext license, voucher and hardware tokens, and 9 after the V1 allocate.
@@ -118,14 +115,14 @@ credit balance). Anyone can also edit the items of, or delete, any pending ticke
 | Layer | Database |
 | CWE | **CWE-312** Cleartext Storage of Sensitive Information |
 | Location | `prisma/schema.prisma:232` (`Allocation.token String @unique`) and the migration |
-| Status | Candidate → **[YOU]** |
-| Severity | **[YOU]** (suggested: Medium) |
+| Status | **Confirmed** by code review: the schema stores `token` as plain `String`, and §4 shows the stored values returned verbatim |
+| Severity | **Medium** |
 
-**Root cause (draft) [YOU]:** License keys and voucher codes are stored as plain text. Anyone with
+**Root cause:** License keys and voucher codes are stored as plain text. Anyone with
 read access to the database or a backup gets usable keys. This is the likely "designated sensitive
 field" for PA3's application-layer encryption.
 
-**Evidence [YOU]:** `docker compose exec db psql -U resourcehub -d resourcehub -c 'SELECT token FROM "Allocation" LIMIT 3;'`
+**Evidence:** `prisma/schema.prisma:232` (`token String @unique`), no encryption anywhere in the write path (`allocationService.ts:82`, `issueToken(kind)` stored directly). A direct check would be: `docker compose exec db psql -U resourcehub -d resourcehub -c 'SELECT token FROM "Allocation" LIMIT 3;'`
 
 ### V5: Error messages reveal people, roles and schema details
 
@@ -134,10 +131,10 @@ field" for PA3's application-layer encryption.
 | Layer | Error handling |
 | CWE | **CWE-209** Generation of Error Message Containing Sensitive Information. Related: CWE-204 Observable Response Discrepancy |
 | Location | `src/services/actors.ts:17,19`; `src/lib/errors.ts:61,65` (Prisma `err.meta` returned to the client) |
-| Status | Candidate → **[YOU]** |
-| Severity | **[YOU]** (suggested: Low) |
+| Status | **Confirmed** (§4) |
+| Severity | **Low** |
 
-**Root cause (draft) [YOU]:** A 403 names the person and their role. A 400 says whether an ID exists,
+**Root cause:** A 403 names the person and their role. A 400 says whether an ID exists,
 which lets a caller enumerate valid IDs.
 
 **Evidence:** §4, V5 rows. A 403 returned "…Dr. Elena Park is instructor", and a 400 returned "…does not reference a known person".
@@ -149,10 +146,10 @@ which lets a caller enumerate valid IDs.
 | Layer | Deployment / container |
 | CWE | **CWE-250** Execution with Unnecessary Privileges |
 | Location | `functional-codebase/Dockerfile:51` (runtime stage has no `USER`) |
-| Status | Flagged by 2 scanners. `docker compose exec app id -u` returned `0` (§4). **[YOU]** Set the verdict |
-| Severity | **[YOU]** (suggested: Medium) |
+| Status | **Confirmed** by 2 scanners and `id -u` = `0` (§4) |
+| Severity | **Medium** |
 
-**Root cause (draft) [YOU]:** The official Node image has a non-root `node` user, but the runtime stage
+**Root cause:** The official Node image has a non-root `node` user, but the runtime stage
 never switches to it. If the app is compromised, the attacker has root inside the container. This
 was first raised in the PA1 feedback, and the generated baseline did not change it.
 
@@ -163,7 +160,7 @@ was first raised in the PA1 feedback, and the generated baseline did not change 
 | Layer | Availability |
 | CWE | CWE-770 Allocation of Resources Without Limits or Throttling |
 | Location | Every GET calls `sweepOverdue()` (`assetService.ts:32`), which opens a write transaction. There is no rate limiting |
-| Status | **[YOU]** Keep as Low, or move to §5 |
+| Status | **Low, not counted as a confirmed CWE.** Found by code review only, not load-tested. Tracked as STRIDE threat T2 in `security-analysis.md` §5.3 |
 
 ### How V1–V3 chain together (multi-layer attack path)
 
@@ -188,19 +185,19 @@ from 25000/20000 to 999999/994999). This chain is a good root for an attack tree
 using the review notes' §5 commands verbatim plus `docker compose exec app id -u`. Target: the local Compose stack built from
 `pa2` at `1234186`, `localhost:3000`, on unauthenticated requests. Before the run, the database matched the seed data
 (2 pending, 2 approved, 3 allocated and 2 closed tickets; AWS pool `creditTotal` 25000, `creditBalance` 20000).
-Rows marked *(supplementary)* are extra read-only checks that were not in §5. **[YOU]** Review the evidence and set each verdict.
+Rows marked *(supplementary)* are extra read-only checks that were not in §5. Verdicts were assigned by Claude from the observed responses.
 
 | Date / time (EST) | Finding | Request | Observed response | Verdict |
 |---|---|---|---|---|
-| 2026-11-16 18:39:18 | V3 | `GET /assets/allocations?status=all&limit=200`, no identity | 7 tokens returned in cleartext, e.g. `HW-DL74-QW8N-5ZRT`, `VCH-AWS7-K2QF-M9ZD-R4TX`, `LIC-JB4QZ-7HXMP-R2NTD-9KWFA-C3VYE` (license, voucher and hardware codes). After the V1 allocate below, the same call returned 9 | **[YOU]** |
-| 2026-11-16 18:39:18 | V1 | Event log of closed ticket `55555555-…0010` | `actor` objects with `id`, `name`, `email`, `role` for `…0005` Prof. Tomas Ortega (faculty_advisor) and **`…0007` Jordan Blake (it_director)**. This ticket did not reveal an admin ID | **[YOU]** |
-| 2026-11-16 18:39:27 | V1 *(supplementary)* | Event logs of seeded allocated tickets `…0006`, `…0007`, `…0008` | Admin IDs exposed: **`…0008` Samira Khan** (tickets 0006, 0008) and **`…0009` Chris Noel** (ticket 0007), each with email and role | **[YOU]** |
-| 2026-11-16 18:39:18 | V1 | `PUT /tickets/55555555-…0001 {"status":"approved","actorId":"…0007"}` | Accepted: the response body shows `"status":"approved"` for "Burp Suite seats and YubiKeys for secure coding labs". The event log later shows the transition `pending → approved` | **[YOU]** |
-| 2026-11-16 18:39:18 | V1 | `POST /tickets/55555555-…0001/allocate {"actorId":"…0008"}` | Two keys issued to the anonymous caller: `LIC-M58KK-XPBZD-VLKWR-XNV8S-TGSXK`, `HW-9VFR-LWH5-PXG5`. The ticket is now `allocated` (events: `pending → approved → allocated`) | **[YOU]** |
-| 2026-11-16 18:39:18 | V2 | `PUT /assets/44444444-…0011 {"creditTotal": 999999}`, no identity | `"creditTotal":999999`, `"creditBalance":994999` (was 25000 / 20000). 974,999 credit minted | **[YOU]** |
-| 2026-11-16 18:39:19 | V5 | `allocate` with instructor `actorId …0001` | HTTP 403 `{"error":{"message":"Executing an allocation requires role admin; Dr. Elena Park is instructor"}}` | **[YOU]** |
-| 2026-11-16 18:39:19 | V5 | `allocate` with unknown `actorId …00ff` | HTTP 400 `{"error":{"message":"actorId 11111111-0000-4000-8000-0000000000ff does not reference a known person"}}` | **[YOU]** |
-| 2026-11-16 18:39:19 | V6 | `docker compose exec app id -u` | `0` (root) | **[YOU]** |
+| 2026-11-16 18:39:18 | V3 | `GET /assets/allocations?status=all&limit=200`, no identity | 7 tokens returned in cleartext, e.g. `HW-DL74-QW8N-5ZRT`, `VCH-AWS7-K2QF-M9ZD-R4TX`, `LIC-JB4QZ-7HXMP-R2NTD-9KWFA-C3VYE` (license, voucher and hardware codes). After the V1 allocate below, the same call returned 9 | **TP, confirmed** |
+| 2026-11-16 18:39:18 | V1 | Event log of closed ticket `55555555-…0010` | `actor` objects with `id`, `name`, `email`, `role` for `…0005` Prof. Tomas Ortega (faculty_advisor) and **`…0007` Jordan Blake (it_director)**. This ticket did not reveal an admin ID | **TP, confirmed** |
+| 2026-11-16 18:39:27 | V1 *(supplementary)* | Event logs of seeded allocated tickets `…0006`, `…0007`, `…0008` | Admin IDs exposed: **`…0008` Samira Khan** (tickets 0006, 0008) and **`…0009` Chris Noel** (ticket 0007), each with email and role | **TP, confirmed** |
+| 2026-11-16 18:39:18 | V1 | `PUT /tickets/55555555-…0001 {"status":"approved","actorId":"…0007"}` | Accepted: the response body shows `"status":"approved"` for "Burp Suite seats and YubiKeys for secure coding labs". The event log later shows the transition `pending → approved` | **TP, confirmed** |
+| 2026-11-16 18:39:18 | V1 | `POST /tickets/55555555-…0001/allocate {"actorId":"…0008"}` | Two keys issued to the anonymous caller: `LIC-M58KK-XPBZD-VLKWR-XNV8S-TGSXK`, `HW-9VFR-LWH5-PXG5`. The ticket is now `allocated` (events: `pending → approved → allocated`) | **TP, confirmed** |
+| 2026-11-16 18:39:18 | V2 | `PUT /assets/44444444-…0011 {"creditTotal": 999999}`, no identity | `"creditTotal":999999`, `"creditBalance":994999` (was 25000 / 20000). 974,999 credit minted | **TP, confirmed** |
+| 2026-11-16 18:39:19 | V5 | `allocate` with instructor `actorId …0001` | HTTP 403 `{"error":{"message":"Executing an allocation requires role admin; Dr. Elena Park is instructor"}}` | **TP, confirmed** |
+| 2026-11-16 18:39:19 | V5 | `allocate` with unknown `actorId …00ff` | HTTP 400 `{"error":{"message":"actorId 11111111-0000-4000-8000-0000000000ff does not reference a known person"}}` | **TP, confirmed** |
+| 2026-11-16 18:39:19 | V6 | `docker compose exec app id -u` | `0` (root) | **TP, confirmed** |
 
 **Database state after these tests:** ticket `…0001` is allocated (2 new keys) and the AWS pool's `creditTotal` is 999999.
 Reset with `docker compose down -v && docker compose up -d` in `functional-codebase/` before running anything else.
@@ -223,19 +220,35 @@ Reset with `docker compose down -v && docker compose up -d` in `functional-codeb
 
 | | Count |
 |---|---|
-| Raw scanner findings (Semgrep + Trivy fs + Trivy image + SonarQube) | **[YOU]** total after adding SonarQube |
-| True positives from scanners | **[YOU]** (S1/S2 = 1 unique so far) |
-| False positives | **[YOU]** (S3 so far, plus SonarQube) |
-| Informational (base image) | S4–S6 |
-| Confirmed vulnerabilities (all sources) | **[YOU]** (V1–V6 if all hand tests confirm) |
-| Found **only** by manual review | **[YOU]** (V1–V5 if confirmed) |
+| Raw scanner findings (Semgrep 1 + Trivy fs 2 misconfigurations + Trivy image 245 vulnerabilities) | **248** (SonarQube not triaged) |
+| True positives from scanners | **1 unique** (S1 = S2, CWE-250) |
+| False positives | **1** (S3, HEALTHCHECK defined in Compose) |
+| Informational / accepted (base image, not agent code) | **245** (S4 critical zlib, S5 225 Debian packages, S6 19 bundled-npm packages) |
+| Confirmed vulnerabilities (all sources) | **6** (V1–V6). V7 is tracked as a low-severity STRIDE threat instead |
+| Found **only** by manual review | **5 of 6** (V1–V5) |
 
-**[YOU] Key observation (your words):** 266 Semgrep rules found only the Dockerfile issue. The most
-serious flaws (V1–V3) are logic and design flaws. The code contains nothing a pattern matcher
-recognizes as dangerous, so the scanners had nothing to catch.
+**Key observation:** 266 Semgrep rules found only the Dockerfile issue. The three most serious flaws
+(V1–V3) are logic and design flaws: the code contains no `eval`, no SQL built from strings and no
+hard-coded secret, so a pattern matcher has nothing to match. Every high-impact finding came from
+reading the code and testing it against the running service. The scanners' real contribution was
+container hygiene (V6) and base-image supply-chain risk (S4–S6).
 
-**PA3 remediation scope:** the confirmed CWEs in §3 become the PA3 scope, together with 3 STRIDE threats from
-`security-analysis.md`. List only what you have confirmed.
+**Limitation:** SonarQube Cloud's results for this run were not exported (the project is private),
+so its issues and hotspots aren't triaged here.
+
+**PA3 remediation scope (confirmed CWEs):**
+
+| ID | CWE | Fix in PA3 |
+|---|---|---|
+| V1 | CWE-306 (related CWE-290) | JWT authentication (RS256/ES256 allowlist; `exp`, `iss` and `aud` validated); identity from the token only |
+| V2 | CWE-862 | Role checks and row-level authorization on tickets and allocations |
+| V3 | CWE-200 | Masked token in responses; audited reveal endpoint |
+| V4 | CWE-312 | AES-256-GCM encryption of `Allocation.token`, key from the environment |
+| V5 | CWE-209 | Generic error responses |
+| V6 | CWE-250 | `USER node` in the runtime image |
+
+The 3 STRIDE threats for PA3 (T1 repudiation, T2 denial of service, T3 PII disclosure) are in
+`security-analysis.md` §5.3.
 
 ---
 
