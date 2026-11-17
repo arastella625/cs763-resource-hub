@@ -10,10 +10,10 @@
 |---|---|
 | Deliverable | `sast-triage-report.md` (PA2) |
 | Author | Amber Rastella |
-| AI tools | Claude Code in the Claude desktop app (Claude Opus 5.5, `claude-opus-5-5`): code review, report skeleton, scanner ledger, suggested verdicts |
-| Human work | **[YOU]** For example: dynamic verification of every confirmed finding, final TP/FP decisions, root-cause explanations, SonarQube triage |
+| AI tools | Claude Code (Claude Opus 5.5, `claude-opus-5-5`): code review (Appendix A), report skeleton, scanner ledger, suggested verdicts and draft root causes. It also ran the §4 dynamic verification commands at the author's direction (see the provenance note in §4) |
+| Human work | **[YOU]** Only what you actually did, for example: directing the review and the tests, reviewing the evidence, final TP/FP verdicts, rewriting root causes in your own words, SonarQube triage |
 | Conceptual AI contribution | **[YOU]** Set a percentage when the report is finished, for example "~40% (structure and scanner ledger); verdicts and analysis human-verified" |
-| Summary of design-aid prompts | "Review the generated code"; "Start a sast-triage-report.md skeleton with the scanner ledger filled in" |
+| Summary of design-aid prompts | "Review the generated code"; "Start a sast-triage-report.md skeleton with the scanner ledger filled in"; running the review notes' §5 hand-test commands; "Paste my code review notes into the sast-triage report" |
 | AI log | **[YOU]** Link or path to the export of the desktop session that produced this skeleton, in `.ai_logs/` |
 
 ---
@@ -27,8 +27,8 @@
 | Semgrep | 1.183.0, 266 rules from `p/default`, `p/owasp-top-ten`, `p/nodejs`, `p/typescript`, `p/dockerfile`, `p/secrets`, run on 60 tracked files (all 21 application source files) |
 | Trivy | 0.76.1, filesystem scan (dependencies, secrets, misconfigurations) and image scan |
 | SonarQube Cloud | Analysis of branch `pa2` succeeded. **[YOU]** Add the export or screenshots |
-| Manual review | Line-by-line reading of routes, services, repositories, validation, schema and migration |
-| Dynamic verification | `curl` against the running Docker Compose stack, with seeded data. **[YOU]** Record the date and results in §4 |
+| Manual review | Reading of routes, services, repositories, validation, schema and migration (Claude Code review notes, Appendix A) |
+| Dynamic verification | `curl` against the running Docker Compose stack, starting from seed data, 2026-11-16 18:39 EST, run by Claude Code at the author's direction (§4) |
 
 **Verdict definitions**
 
@@ -78,7 +78,7 @@ so the role check confirms a *claim*, not an identity. The IDs of the IT directo
 returned in every ticket's event log, so an anonymous caller can approve tickets and execute
 allocations by sending those IDs.
 
-**Evidence [YOU]:** results of the F1 commands (approve as `...0007`, allocate as `...0008`).
+**Evidence:** §4, V1 rows. Staff IDs were read from event logs, an anonymous `PUT` approved ticket `…0001` as `…0007`, and an anonymous `allocate` as `…0008` issued 2 keys.
 
 ### V2: Missing authorization on inventory and ticket management
 
@@ -94,7 +94,7 @@ allocations by sending those IDs.
 or retire assets, resize a pool, or raise a voucher pool's `creditTotal` (and with it the available
 credit balance). Anyone can also edit the items of, or delete, any pending ticket.
 
-**Evidence [YOU]:** result of the `creditTotal: 999999` command.
+**Evidence:** §4, V2 row. With no identity at all, the AWS pool went from `creditTotal` 25000 / `creditBalance` 20000 to 999999 / 994999.
 
 ### V3: License keys and voucher codes exposed to unauthenticated callers
 
@@ -109,7 +109,7 @@ credit balance). Anyone can also edit the items of, or delete, any pending ticke
 **Root cause (draft) [YOU]:** The serializer copies the whole database row into the response.
 `GET /assets/allocations?status=all` has no caller check and returns every issued key and code.
 
-**Evidence [YOU]:** count of `"token"` values returned by the F3 command.
+**Evidence:** §4, V3 row. An anonymous `GET /assets/allocations?status=all` returned 7 cleartext license, voucher and hardware tokens, and 9 after the V1 allocate.
 
 ### V4: Keys stored in cleartext
 
@@ -140,6 +140,8 @@ field" for PA3's application-layer encryption.
 **Root cause (draft) [YOU]:** A 403 names the person and their role. A 400 says whether an ID exists,
 which lets a caller enumerate valid IDs.
 
+**Evidence:** §4, V5 rows. A 403 returned "…Dr. Elena Park is instructor", and a 400 returned "…does not reference a known person".
+
 ### V6: Container runs as root (= S1, S2)
 
 | Field | Value |
@@ -147,7 +149,7 @@ which lets a caller enumerate valid IDs.
 | Layer | Deployment / container |
 | CWE | **CWE-250** Execution with Unnecessary Privileges |
 | Location | `functional-codebase/Dockerfile:51` (runtime stage has no `USER`) |
-| Status | Confirmed by 2 scanners. **[YOU]** add the `id -u` result |
+| Status | Flagged by 2 scanners. `docker compose exec app id -u` returned `0` (§4). **[YOU]** Set the verdict |
 | Severity | **[YOU]** (suggested: Medium) |
 
 **Root cause (draft) [YOU]:** The official Node image has a non-root `node` user, but the runtime stage
@@ -163,21 +165,45 @@ was first raised in the PA1 feedback, and the generated baseline did not change 
 | Location | Every GET calls `sweepOverdue()` (`assetService.ts:32`), which opens a write transaction. There is no rate limiting |
 | Status | **[YOU]** Keep as Low, or move to §5 |
 
+### How V1–V3 chain together (multi-layer attack path)
+
+No single finding above is the whole story. Together they give an anonymous caller a complete path
+from no knowledge to stolen keys, crossing four layers (data output → authentication → business
+logic → data output). The §4 tests ran this exact chain:
+
+1. **Recon (V3/V5, data output):** `GET /assets/tickets?status=closed`, then `GET /assets/tickets/{id}`. The event log returns staff `actor` objects with `id`, `email` and `role` (§4: IT director `…0007`; admins `…0008` and `…0009`).
+2. **Spoof approval (V1, authentication):** `PUT /assets/tickets/{pending}` with `{"status":"approved","actorId":"…0007"}`. Accepted.
+3. **Spoof allocation (V1, business logic):** `POST /assets/tickets/{id}/allocate` with `{"actorId":"…0008"}`. Inventory is deducted and keys are issued.
+4. **Collect (V3, data output):** `GET /assets/allocations?status=all` returns every issued key and code, including the two just created (§4: 7 before, 9 after).
+
+Separately, V2 lets the same anonymous caller mint voucher credit with one request (§4: AWS pool
+from 25000/20000 to 999999/994999). This chain is a good root for an attack tree in
+`security-analysis.md`.
+
 ---
 
 ## 4. Dynamic verification log
 
-**[YOU]** One row per command you ran (the commands are in the review notes, §5).
+**Provenance:** Claude Code (`claude-opus-5-5`) ran these commands at the author's direction on 2026-11-16,
+using the review notes' §5 commands verbatim plus `docker compose exec app id -u`. Target: the local Compose stack built from
+`pa2` at `1234186`, `localhost:3000`, on unauthenticated requests. Before the run, the database matched the seed data
+(2 pending, 2 approved, 3 allocated and 2 closed tickets; AWS pool `creditTotal` 25000, `creditBalance` 20000).
+Rows marked *(supplementary)* are extra read-only checks that were not in §5. **[YOU]** Review the evidence and set each verdict.
 
-| Date / time | Finding | Request | Observed response | Verdict |
+| Date / time (EST) | Finding | Request | Observed response | Verdict |
 |---|---|---|---|---|
-| | V3 | `GET /assets/allocations?status=all` | | |
-| | V1 | event log reveals staff IDs | | |
-| | V1 | `PUT /tickets/{pending}` as `...0007` | | |
-| | V1 | `POST /tickets/{id}/allocate` as `...0008` | | |
-| | V2 | `PUT /assets/...0011 {creditTotal: 999999}` | | |
-| | V5 | `allocate` with an instructor or unknown `actorId` | | |
-| | V6 | `docker compose exec app id -u` | | |
+| 2026-11-16 18:39:18 | V3 | `GET /assets/allocations?status=all&limit=200`, no identity | 7 tokens returned in cleartext, e.g. `HW-DL74-QW8N-5ZRT`, `VCH-AWS7-K2QF-M9ZD-R4TX`, `LIC-JB4QZ-7HXMP-R2NTD-9KWFA-C3VYE` (license, voucher and hardware codes). After the V1 allocate below, the same call returned 9 | **[YOU]** |
+| 2026-11-16 18:39:18 | V1 | Event log of closed ticket `55555555-…0010` | `actor` objects with `id`, `name`, `email`, `role` for `…0005` Prof. Tomas Ortega (faculty_advisor) and **`…0007` Jordan Blake (it_director)**. This ticket did not reveal an admin ID | **[YOU]** |
+| 2026-11-16 18:39:27 | V1 *(supplementary)* | Event logs of seeded allocated tickets `…0006`, `…0007`, `…0008` | Admin IDs exposed: **`…0008` Samira Khan** (tickets 0006, 0008) and **`…0009` Chris Noel** (ticket 0007), each with email and role | **[YOU]** |
+| 2026-11-16 18:39:18 | V1 | `PUT /tickets/55555555-…0001 {"status":"approved","actorId":"…0007"}` | Accepted: the response body shows `"status":"approved"` for "Burp Suite seats and YubiKeys for secure coding labs". The event log later shows the transition `pending → approved` | **[YOU]** |
+| 2026-11-16 18:39:18 | V1 | `POST /tickets/55555555-…0001/allocate {"actorId":"…0008"}` | Two keys issued to the anonymous caller: `LIC-M58KK-XPBZD-VLKWR-XNV8S-TGSXK`, `HW-9VFR-LWH5-PXG5`. The ticket is now `allocated` (events: `pending → approved → allocated`) | **[YOU]** |
+| 2026-11-16 18:39:18 | V2 | `PUT /assets/44444444-…0011 {"creditTotal": 999999}`, no identity | `"creditTotal":999999`, `"creditBalance":994999` (was 25000 / 20000). 974,999 credit minted | **[YOU]** |
+| 2026-11-16 18:39:19 | V5 | `allocate` with instructor `actorId …0001` | HTTP 403 `{"error":{"message":"Executing an allocation requires role admin; Dr. Elena Park is instructor"}}` | **[YOU]** |
+| 2026-11-16 18:39:19 | V5 | `allocate` with unknown `actorId …00ff` | HTTP 400 `{"error":{"message":"actorId 11111111-0000-4000-8000-0000000000ff does not reference a known person"}}` | **[YOU]** |
+| 2026-11-16 18:39:19 | V6 | `docker compose exec app id -u` | `0` (root) | **[YOU]** |
+
+**Database state after these tests:** ticket `…0001` is allocated (2 new keys) and the AWS pool's `creditTotal` is 999999.
+Reset with `docker compose down -v && docker compose up -d` in `functional-codebase/` before running anything else.
 
 ---
 
@@ -210,3 +236,78 @@ recognizes as dangerous, so the scanners had nothing to catch.
 
 **PA3 remediation scope:** the confirmed CWEs in §3 become the PA3 scope, together with 3 STRIDE threats from
 `security-analysis.md`. List only what you have confirmed.
+
+---
+
+## Appendix A: Code review notes
+
+> **Provenance:** Claude Code (`claude-opus-5-5`, Claude desktop app) wrote this appendix in a read-only
+> review of `pa2` at `fb3b30f` on 2026-11-16. It was pasted here at the author's request, lightly
+> edited for this report. It is context for the findings above, not independent human analysis.
+
+### A.1 What the agent produced
+
+| | |
+|---|---|
+| Commits | 6, all tagged `AI:`, 17:42–17:58 EST (about 16 minutes), one agent session, no follow-up prompts |
+| Size | About 3,500 lines in 43 files (src about 1,700, tests about 820, migration 264, seed 226, README 347) |
+| Tests | 48 Vitest + Supertest integration tests, all passing (locally and in CI run 43976561548) |
+| Scope | Nothing outside `functional-codebase/` changed, and no dependencies were added |
+
+### A.2 How the code is organized
+
+Layered architecture: **route → validation → service → repository → Prisma/PostgreSQL**, with central
+error middleware.
+
+| Layer | Files | Job |
+|---|---|---|
+| App / routing | `src/app.ts`, `src/routes/*.ts` | `express.json` (100 kb limit), request logger, one `Router` per resource, 404 and error handlers |
+| Validation | `src/validation/schemas.ts` | Zod `strictObject` schemas for every body, path parameter and query string |
+| Services | `src/services/*.ts` | Business rules: role checks, ticket lifecycle, allocation engine, metrics |
+| Repositories | `src/repositories/*.ts` | Prisma queries and filters (the Repository pattern) |
+| Data | `prisma/schema.prisma`, migration | 8 models, 6 enums, plus 6 hand-written `CHECK` constraints |
+| Cross-cutting | `src/lib/errors.ts`, `logger.ts`, `assetKinds.ts` | `HttpError` type, JSON-line logs, token generator |
+
+**Trace of `POST /api/v1/assets/tickets/{id}/allocate`:**
+
+1. `routes/tickets.ts` parses `ticket_id` as a UUID and the body with `allocateTicketSchema` (`actorId`, optional `note`).
+2. `allocationService.allocateTicket` calls `requireActor(actorId, [admin])`, which loads the person named **in the request body** and checks their role. This is the V1 weakness: it verifies a claim, not an identity.
+3. It then opens one Prisma interactive transaction:
+   - It **claims the ticket** with `updateMany where {id, status: approved}` → `allocated`. If 0 rows change, it returns 409, which is why a second, concurrent allocate fails.
+   - For each line, `deductStock` runs a **conditional** `updateMany where availableStock >= qty` (and `creditBalance >= credit`). If 0 rows change, it throws, and the whole transaction rolls back (all-or-nothing).
+   - It creates one `Allocation` per line with a token from `issueToken()` (`crypto.randomBytes`), and a due date for physical items.
+   - It writes a `TicketEvent` audit row and recomputes the pool status flags.
+4. After the commit it reloads the ticket and returns it **with every allocation and its token**. This is the V3 weakness.
+
+### A.3 Defenses the agent added without being asked
+
+The prompt deliberately said nothing about security, validation or integrity. The agent still added:
+
+- Zod `strictObject` on every input (unknown fields rejected, so no mass assignment), length limits, UUID checks, and page size capped at 200.
+- Database `CHECK` constraints: stock and credit never negative or above total, quantity > 0, exactly one of course or lab.
+- Concurrency guards (status-conditional updates) on allocate, return, edit and every ticket transition.
+- Role checks (IT director approves, admin allocates, only the course instructor or lab advisor can request) and a `TicketEvent` audit trail.
+- Cryptographically random tokens, a generic 500 message with no stack trace, and a 100 kb body limit.
+
+**What this means for the triage:** the naive baseline is not naive about *input* or *integrity*. That
+is why the race condition, negative quantities and mass assignment appear in §5 as checked and not
+vulnerable. The weaknesses are concentrated in **authentication, authorization and confidentiality**:
+the agent built role checks on top of an identity that nobody verifies. It even recorded this as
+README assumption 1 ("No authentication... Identity is supplied in the request body"), treating it
+as a gap in the spec rather than a risk.
+
+### A.4 What the generated tests never try
+
+All 48 tests check functionality and business rules. None of them sends a forged `actorId`, calls a
+write endpoint with no identity, or checks that a response leaves out tokens. The test "only an
+administrator can execute the allocation" passes because the test supplies an honest `actorId`.
+Happy-path tests like these cannot reveal V1–V3.
+
+### A.5 Why the scanners missed V1–V5
+
+Semgrep ran 266 rules and reported only the Dockerfile `USER` issue (V6). Missing authentication, an
+identity the caller supplies, missing authorization, and keys returned in responses are logic and
+design flaws. Nothing in the code *looks* dangerous: no `eval`, no SQL built from strings, no
+hard-coded secret, so pattern matching had nothing to match. The 245 Trivy image findings come from
+the `node:24.22.2-slim` base image (226 Debian packages, plus 19 in the npm CLI under
+`/usr/local/lib`), not from agent-generated code.
